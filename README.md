@@ -2,6 +2,8 @@
 
 A shared grocery list and expense-splitting app for households. Housemates keep one list, log what they spend, and see where the money goes.
 
+**Live demo:** https://market-app-topaz.vercel.app
+
 ## Features
 
 - **Shared shopping list** – household members join with a shared code and add items with quantity, notes and category. Items are marked as bought once they're in the basket.
