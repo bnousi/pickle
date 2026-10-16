@@ -1045,9 +1045,9 @@ export default function App() {
   const today = DAYS[new Date().getDay()];
 
   const demoPill = isDemo ? (
-    <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 120, display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px 8px 14px', backgroundColor: '#1A1A1A', color: '#FFFFFF', borderRadius: '20px', fontSize: '12px', fontWeight: '700', boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}>
-      <span>Demo</span>
-      <button type="button" onClick={e => { e.stopPropagation(); exitDemo(); }} style={{ padding: '4px 10px', backgroundColor: '#FFFFFF', color: '#1A1A1A', border: 'none', borderRadius: '12px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit' }}>
+    <div style={{ position: 'relative', zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '8px 16px', backgroundColor: '#1A1A1A', color: '#FFFFFF', fontSize: '12px', fontWeight: '700', letterSpacing: '0.3px' }}>
+      <span>Demo · sample data, nothing is saved</span>
+      <button type="button" onClick={e => { e.stopPropagation(); exitDemo(); }} style={{ padding: '4px 12px', backgroundColor: '#FFFFFF', color: '#1A1A1A', border: 'none', borderRadius: '12px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit' }}>
         Exit
       </button>
     </div>
