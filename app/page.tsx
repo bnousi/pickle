@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
 import { PRODUCTS, CAT, CAT_ORDER, type Category, type Product } from './lib/products';
+import { buildDemo } from './lib/demo';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,7 @@ function resolveExpCat(cat: string | undefined): Category {
 export default function App() {
   const [ready, setReady] = useState(false);
   const [isSetup, setIsSetup] = useState(true);
+  const [isDemo, setIsDemo] = useState(false);
   const [userName, setUserName] = useState('');
   const [partnerName, setPartnerName] = useState('');
   const [tab, setTab] = useState<Tab>('shop');
@@ -279,6 +281,11 @@ export default function App() {
     if (cp) setCustomProducts(JSON.parse(cp));
     if (th && th in THEMES) setThemeName(th);
     if (code) setHouseholdCode(code);
+    if (localStorage.getItem('pickle-demo') === '1') {
+      setIsDemo(true);
+      const dh = localStorage.getItem('pickle-demo-history');
+      if (dh) setHistory(JSON.parse(dh));
+    }
     // One-time notice for people who set the app up under its old name:
     // home screen icons/names are fixed at install time, so they must re-add it
     if (!localStorage.getItem('pickle-rename-seen')) {
@@ -547,6 +554,42 @@ export default function App() {
     setUserName(u); setPartnerName(p);
     setHouseholdCode(code);
     setIsSetup(false);
+  }
+
+  // ── Demo ─────────────────────────────────────────────────────────────────
+  // Local-only sample household: no household code, so nothing is synced.
+  function clearLocalData() {
+    for (const k of Object.keys(localStorage)) {
+      if ((k.startsWith('dnk-') || k.startsWith('pickle-')) && k !== 'dnk-theme') localStorage.removeItem(k);
+    }
+  }
+
+  function startDemo() {
+    const d = buildDemo();
+    clearLocalData();
+    localStorage.setItem('pickle-rename-seen', '1');
+    localStorage.setItem('pickle-demo', '1');
+    localStorage.setItem('pickle-demo-history', JSON.stringify(d.history));
+    localStorage.setItem('dnk-user', d.user);
+    localStorage.setItem('dnk-partner', d.partner);
+    localStorage.setItem('dnk-items', JSON.stringify(d.items));
+    localStorage.setItem('dnk-expenses', JSON.stringify(d.expenses));
+    localStorage.setItem('dnk-budget', String(d.budget));
+    setUserName(d.user); setPartnerName(d.partner);
+    setItems(d.items); setExpenses(d.expenses); setHistory(d.history);
+    setBudget(d.budget);
+    setHouseholdCode('');
+    setIsDemo(true);
+    setIsSetup(false);
+  }
+
+  function exitDemo() {
+    clearLocalData();
+    localStorage.setItem('pickle-rename-seen', '1');
+    setItems([]); setExpenses([]); setHistory([]); setBudget(null);
+    setUserName(''); setPartnerName('');
+    setIsDemo(false);
+    setIsSetup(true);
   }
 
   // ── Shop ─────────────────────────────────────────────────────────────────
@@ -985,6 +1028,12 @@ export default function App() {
           <button type="submit" style={{ marginTop: '10px', width: '100%', padding: '16px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '900', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.5px' }}>
             Get started
           </button>
+          <button type="button" onClick={startDemo} style={{ width: '100%', padding: '14px', backgroundColor: 'transparent', color: C.accent, border: `1.5px solid ${C.accent}`, borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.5px' }}>
+            Try the demo
+          </button>
+          <p style={{ fontSize: '12px', color: C.dim, margin: '-4px 0 0', textAlign: 'center', lineHeight: 1.6 }}>
+            Explore a sample household. Nothing is saved to the server.
+          </p>
         </form>
       </div>
     </div>
@@ -995,8 +1044,18 @@ export default function App() {
 
   const today = DAYS[new Date().getDay()];
 
+  const demoPill = isDemo ? (
+    <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 120, display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px 8px 14px', backgroundColor: '#1A1A1A', color: '#FFFFFF', borderRadius: '20px', fontSize: '12px', fontWeight: '700', boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}>
+      <span>Demo</span>
+      <button type="button" onClick={e => { e.stopPropagation(); exitDemo(); }} style={{ padding: '4px 10px', backgroundColor: '#FFFFFF', color: '#1A1A1A', border: 'none', borderRadius: '12px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit' }}>
+        Exit
+      </button>
+    </div>
+  ) : null;
+
   if (showHome) return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8F7F2', position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {demoPill}
 
       {/* Foreground stickers — edges */}
       <img src="/stk-strawberries.png"   alt="" style={{ position: 'absolute', top: '2%',  left: '-38px',  width: '116px', transform: 'rotate(-122deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 2 }} />
@@ -1068,6 +1127,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: C.bg, paddingBottom: '32px', position: 'relative', zIndex: 0 }}
       onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      {demoPill}
       <style>{`
         @keyframes pulse-fab { 0%,100% { box-shadow: 0 4px 20px rgba(27,95,173,0.45); } 50% { box-shadow: 0 4px 32px rgba(27,95,173,0.75); } }
         @keyframes slide-up { from { opacity:0; transform:translateY(12px);} to { opacity:1; transform:translateY(0);} }
