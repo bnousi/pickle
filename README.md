@@ -4,6 +4,12 @@ A shared grocery list and expense-splitting app for households. Housemates keep 
 
 **Live app:** [pickle-list.vercel.app](https://pickle-list.vercel.app). Tap **Try the demo** on the first screen to explore a sample household with a shopping list, expenses and spending history. The demo runs in your browser only and nothing is saved to the server.
 
+<p align="center">
+  <img src="docs/screenshots/home.jpg" width="250" alt="Home screen" />
+  <img src="docs/screenshots/list.jpg" width="250" alt="Shopping list" />
+  <img src="docs/screenshots/split.jpg" width="250" alt="Spending and expense split" />
+</p>
+
 ## Features
 
 - **Shared shopping list** – household members join with a shared code and add items with quantity, notes and category. Items are marked as bought once they're in the basket.
