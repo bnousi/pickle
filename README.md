@@ -23,11 +23,28 @@ A shared grocery list and expense-splitting app for households. Housemates keep 
 
 - [Next.js](https://nextjs.org) (App Router) with [React](https://react.dev)
 - [TypeScript](https://www.typescriptlang.org)
-- [Tailwind CSS](https://tailwindcss.com)
 - [PostgreSQL](https://www.postgresql.org) via [Neon](https://neon.tech) (serverless)
 - Web Push notifications ([web-push](https://github.com/web-push-libs/web-push))
 - Receipt reading with the [Gemini API](https://ai.google.dev)
 - Deployed on [Vercel](https://vercel.com)
+
+## Why these choices
+
+- **Next.js** – the screens and the API routes (sync, receipts, push) live in one project and deploy together on Vercel, so there is no separate backend to host.
+- **TypeScript** – items, expenses and households have fixed shapes that both the client and the API routes use, and the compiler catches it when one side changes.
+- **PostgreSQL** – the data is relational (a household has members, items and expenses), and balances and monthly totals are simple queries. Neon's free serverless tier fits a small app.
+- **Plain inline styles** – the colours come from a theme object, so users can switch themes at runtime without a CSS framework.
+- **localStorage plus polling** – the list is kept in the browser, so it opens instantly, and the app checks the server every few seconds for the other person's changes. Polling was simpler than websockets on Vercel's serverless functions and is fast enough for a shopping list.
+
+## Project structure
+
+```
+app/
+  page.tsx        main screen and app state
+  components/     screens and UI pieces (setup, home, item cards, split tab, drawers)
+  lib/            types, theme, product catalogue, demo data, helpers
+  api/            sync, receipt reading and push notification routes
+```
 
 ## Getting started
 
