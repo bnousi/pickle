@@ -1,147 +1,38 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
-import { PRODUCTS, CAT, CAT_ORDER, type Category, type Product } from './lib/products';
+import { CAT, CAT_ORDER, PRODUCTS } from './lib/products';
+import type { Category, Product } from './lib/products';
+import type { Item, Expense, HistoryGroup, CustomProduct, Tab } from './lib/types';
+import { THEMES, SECTION_COLORS } from './lib/theme';
+import type { ThemeName } from './lib/theme';
+import { MONTHS_EN, SUPERMARKETS, SHOP_DONE_MSGS } from './lib/content';
+import { genId, fmtDate, getExpCatDisplay, resolveExpCat } from './lib/format';
 import { buildDemo } from './lib/demo';
+import ItemCard from './components/ItemCard';
+import ProductGrid from './components/ProductGrid';
+import Chip from './components/Chip';
+import Drawer from './components/Drawer';
+import SpendingDetail from './components/SpendingDetail';
+import Empty from './components/Empty';
+import SetupScreen from './components/SetupScreen';
+import HomeScreen from './components/HomeScreen';
+import DemoBanner from './components/DemoBanner';
+import SplitTab from './components/SplitTab';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type Item = {
-  id: string; name: string; quantity: string; notes: string;
-  category: Category; emoji: string; bought: boolean;
-  addedBy: string; createdAt: number; updatedAt?: number;
-};
-
-type Expense = {
-  id: string; paidBy: string;
-  amount: number; note: string; createdAt: number; settledAt?: number;
-  category?: Category;
-};
-
-type HistoryGroup = { settledAt: number; total: number; expenses: Expense[] };
-
-type CustomProduct = {
-  id: string; name: string; category: Category;
-};
-
-type Tab = 'shop' | 'find' | 'split';
-
-// ─── Themes ───────────────────────────────────────────────────────────────────
-
-const THEMES = {
-  dark: {
-    name: 'Dark',
-    bg: '#0A0A0A', surface: '#141414', surface2: '#1E1E1E',
-    border: '#272727', accent: '#C8FF3C', accentDim: 'rgba(200,255,60,0.10)',
-    text: '#F0F0F0', dim: '#7A7A7A', muted: '#3A3A3A',
-    danger: '#FF5050', success: '#4ADE80',
-  },
-  neon: {
-    name: 'Neon',
-    bg: '#09090F', surface: '#13131E', surface2: '#1C1C2E',
-    border: '#2A2A44', accent: '#FF2D78', accentDim: 'rgba(255,45,120,0.12)',
-    text: '#F0F0FF', dim: '#7070A0', muted: '#2A2A3A',
-    danger: '#FF5050', success: '#00F5A0',
-  },
-  pastel: {
-    name: 'Pastel',
-    bg: '#FFFDF7', surface: '#FFF0E6', surface2: '#FFE0CC',
-    border: '#EDD5C0', accent: '#FF6B9D', accentDim: 'rgba(255,107,157,0.12)',
-    text: '#2A1A1A', dim: '#9A7878', muted: '#D8C0B8',
-    danger: '#FF5252', success: '#52C97A',
-  },
-  bold: {
-    name: 'Market',
-    bg: '#F8F7F2', surface: '#FFFFFF', surface2: '#F0EEE8',
-    border: '#E0DDD6', accent: '#1B5FAD', accentDim: 'rgba(27,95,173,0.10)',
-    text: '#1A1A18', dim: '#6B6863', muted: '#C4C0B8',
-    danger: '#D93025', success: '#2D9B4E',
-  },
-} as const;
-
-const SECTION_COLORS = {
-  shop:  { bg: '#1B5FAD', text: '#FFFFFF', dim: 'rgba(27,95,173,0.12)' },
-  find:  { bg: '#E07820', text: '#FFFFFF', dim: 'rgba(224,120,32,0.12)' },
-  split: { bg: '#2D7D46', text: '#FFFFFF', dim: 'rgba(45,125,70,0.12)' },
-};
-
-type ThemeName = keyof typeof THEMES;
-type Theme = {
-  name: string; bg: string; surface: string; surface2: string;
-  border: string; accent: string; accentDim: string;
-  text: string; dim: string; muted: string;
-  danger: string; success: string;
-};
-
-// ─── Greek months ─────────────────────────────────────────────────────────────
-
-const MONTHS_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-const SUPERMARKETS = ['AB', 'Σκλαβενίτης', 'Lidl', 'Μασούτης', 'My Market', 'Γαλαξίας', 'Bazaar', 'OK! Anytime'];
-
-
-// ─── Daily messages ───────────────────────────────────────────────────────────
-
-const DAYS = [
-  { msg: "hello darkness my old fridge.", song: "The Sound of Silence", artist: "Simon & Garfunkel", spotify: "https://open.spotify.com/search/The%20Sound%20of%20Silence%20Simon%20Garfunkel" },
-  { msg: "monday. tell me why, ain't nothin' but an empty fridge.", song: "Tell Me Why", artist: "Backstreet Boys", spotify: "https://open.spotify.com/search/Tell%20Me%20Why%20Backstreet%20Boys" },
-  { msg: "tuesday. should i stay or should i go… to the supermarket.", song: "Should I Stay or Should I Go", artist: "The Clash", spotify: "https://open.spotify.com/search/Should%20I%20Stay%20or%20Should%20I%20Go%20The%20Clash" },
-  { msg: "wednesday. don't you forget about groceries.", song: "Don't You (Forget About Me)", artist: "Simple Minds", spotify: "https://open.spotify.com/search/Don%27t%20You%20Forget%20About%20Me%20Simple%20Minds" },
-  { msg: "thursday. we will, we will stock you.", song: "We Will Rock You", artist: "Queen", spotify: "https://open.spotify.com/search/We%20Will%20Rock%20You%20Queen" },
-  { msg: "it's friday i'm in love - with this grocery app.", song: "Friday I'm in Love", artist: "The Cure", spotify: "https://open.spotify.com/search/Friday%20I%27m%20in%20Love%20The%20Cure" },
-  { msg: "saturday. girls just wanna have full fridges.", song: "Girls Just Want to Have Fun", artist: "Cyndi Lauper", spotify: "https://open.spotify.com/search/Girls%20Just%20Want%20to%20Have%20Fun%20Cyndi%20Lauper" },
+// Faded stickers fixed behind the main screens
+const BACKGROUND_STICKERS: { src: string; style: React.CSSProperties }[] = [
+  { src: '/stk-jello.png', style: { top: '22%', left: '-10px', width: '90px', opacity: 0.2, transform: 'rotate(-10deg)' } },
+  { src: '/stk-super-special.png', style: { top: '34%', right: '-8px', width: '90px', opacity: 0.2, transform: 'rotate(-16deg)' } },
+  { src: '/stk-pie.png', style: { top: '58%', right: '-12px', width: '108px', opacity: 0.2, transform: 'rotate(12deg)' } },
+  { src: '/stk-dragonfruit.png', style: { top: '72%', left: '-8px', width: '96px', opacity: 0.2, transform: 'rotate(-18deg)' } },
+  { src: '/stk-japanese-burst.png', style: { bottom: '4%', right: '-10px', width: '100px', opacity: 0.2, transform: 'rotate(10deg)' } },
+  { src: '/stk-big-sale.png', style: { bottom: '4%', left: '-8px', width: '90px', opacity: 0.2, transform: 'rotate(-14deg)' } },
+  { src: '/stk-grapes.png', style: { top: '42%', left: '58%', width: '82px', opacity: 0.2, transform: 'rotate(-12deg)' } },
+  { src: '/stk-tomatoes-vine.png', style: { top: '55%', left: '28%', width: '84px', opacity: 0.2, transform: 'rotate(16deg)' } },
+  { src: '/stk-pineapple.png', style: { top: '66%', left: '55%', height: '86px', width: 'auto', opacity: 0.2, transform: 'rotate(-8deg)' } },
+  { src: '/stk-soymilk.png', style: { top: '78%', left: '35%', width: '76px', opacity: 0.2, transform: 'rotate(12deg)' } },
 ];
-
-// ─── Shop done messages ───────────────────────────────────────────────────────
-
-const SHOP_DONE_MSGS = [
-  'How much did it hurt?',
-  'Did it sting?',
-  'Pricey?',
-  'There goes the paycheck.',
-  'Money makes the world go round.',
-  "We're in this together.",
-  'Hit me with it.',
-  'You only love me for my wallet.',
-];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function genId() { return Math.random().toString(36).slice(2, 10); }
-function genCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
-
-function fmtDate(ts: number) {
-  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-}
-
-// ─── Expense category display (handles both old and new category values) ──────
-
-const LEGACY_CAT_DISPLAY: Record<string, { label: string; emoji: string; accent: string; bg: string }> = {
-  supermarket: { label: 'Supermarket', emoji: '🛒', accent: '#4CAF50', bg: 'rgba(76,175,80,0.30)' },
-  restaurant:  { label: 'Food & Drink', emoji: '🍽️', accent: '#FF9800', bg: 'rgba(255,152,0,0.30)' },
-  home:        { label: 'Home & Bills', emoji: '🏠', accent: '#2196F3', bg: 'rgba(33,150,243,0.30)' },
-  personal:    { label: 'Health',       emoji: '💊', accent: '#E91E63', bg: 'rgba(233,30,99,0.30)' },
-  other:       { label: 'Other',        emoji: '📦', accent: '#9E9E9E', bg: 'rgba(158,158,158,0.30)' },
-};
-function getExpCatDisplay(cat: string | undefined) {
-  const key = cat || 'other';
-  if (key in CAT) {
-    const c = CAT[key as Category];
-    return { label: c.label, emoji: c.emoji, accent: c.accent, bg: c.bg };
-  }
-  return LEGACY_CAT_DISPLAY[key] ?? LEGACY_CAT_DISPLAY['other'];
-}
-function resolveExpCat(cat: string | undefined): Category {
-  if (!cat) return 'produce';
-  if (cat in CAT) return cat as Category;
-  const legacy: Record<string, Category> = { supermarket: 'produce', restaurant: 'snacks', home: 'home', personal: 'hygiene', other: 'produce' };
-  return legacy[cat] ?? 'produce';
-}
-
-// ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -217,7 +108,6 @@ export default function App() {
 
   // History
   const [history, setHistory] = useState<HistoryGroup[]>([]);
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Buy again
   const [recurring, setRecurring] = useState<Record<string, { category: Category; emoji: string }>>({});
@@ -262,7 +152,6 @@ export default function App() {
 
   // Setup
   const [setupUser, setSetupUser] = useState('');
-  const [setupPartner, setSetupPartner] = useState('');
   const [setupCode, setSetupCode] = useState('');
 
   useEffect(() => {
@@ -534,7 +423,7 @@ export default function App() {
     } catch {}
   }
 
-  // ── Setup ────────────────────────────────────────────────────────────────
+  // Setup
   async function completeSetup(e: React.FormEvent) {
     e.preventDefault();
     if (!setupUser.trim() || setupCode.length !== 6) return;
@@ -546,17 +435,17 @@ export default function App() {
         body: JSON.stringify({ code, name: setupUser.trim() }),
       });
     } catch {}
+    // The partner's name arrives with the first sync, once they join with the same code
     const u = setupUser.trim();
-    const p = setupPartner.trim();
     localStorage.setItem('dnk-user', u);
-    localStorage.setItem('dnk-partner', p);
+    localStorage.setItem('dnk-partner', '');
     localStorage.setItem('dnk-code', code);
-    setUserName(u); setPartnerName(p);
+    setUserName(u); setPartnerName('');
     setHouseholdCode(code);
     setIsSetup(false);
   }
 
-  // ── Demo ─────────────────────────────────────────────────────────────────
+  // Demo
   // Local-only sample household: no household code, so nothing is synced.
   function clearLocalData() {
     for (const k of Object.keys(localStorage)) {
@@ -592,7 +481,7 @@ export default function App() {
     setIsSetup(true);
   }
 
-  // ── Shop ─────────────────────────────────────────────────────────────────
+  // Shop
   function addCustomItem(e: React.FormEvent) {
     e.preventDefault();
     if (!formName.trim()) return;
@@ -719,7 +608,7 @@ export default function App() {
     }
   }
 
-  // ── Custom products ───────────────────────────────────────────────────────
+  // Custom products
   function saveCustomProduct(e: React.FormEvent) {
     e.preventDefault();
     if (!cpName.trim()) return;
@@ -781,7 +670,7 @@ export default function App() {
     setRenameName('');
   }
 
-  // ── Expenses ──────────────────────────────────────────────────────────────
+  // Expenses
   function addExpense(e: React.FormEvent) {
     e.preventDefault();
     const amt = parseFloat(expenseAmount);
@@ -859,7 +748,7 @@ export default function App() {
     }
   }
 
-  // ── Receipt scanner ───────────────────────────────────────────────────────
+  // Receipt scanner
   function resizeImage(file: File, maxPx: number): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -924,7 +813,7 @@ export default function App() {
     setReceiptData(null);
   }
 
-  // ── Derived ───────────────────────────────────────────────────────────────
+  // Derived
   if (!ready) return null;
 
   const toBuy = items.filter(i => !i.bought);
@@ -953,15 +842,7 @@ export default function App() {
   const balance = (totalByUser - totalByPartner) / 2;
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const allExp = [...expenses, ...history.flatMap(g => g.expenses)];
-  const thisMonthTotal = allExp.filter(e => e.createdAt >= monthStart).reduce((s, e) => s + e.amount, 0);
-  const lastMonthTotal = allExp.filter(e => e.createdAt >= lastMonthStart && e.createdAt < monthStart).reduce((s, e) => s + e.amount, 0);
-  const monthDiffPct = lastMonthTotal > 0 ? Math.round((thisMonthTotal - lastMonthTotal) / lastMonthTotal * 100) : null;
-  const budgetPct = budget ? Math.min(thisMonthTotal / budget, 1) : 0;
-  const budgetColor = budgetPct >= 0.9 ? '#FF5050' : budgetPct >= 0.7 ? '#F59E0B' : '#4ADE80';
 
   const allProducts: (Product & { isCustom?: boolean })[] = [
     ...PRODUCTS.filter(p => !hiddenProducts.has(p.id)),
@@ -976,158 +857,28 @@ export default function App() {
     return filterCat === 'all' ? allProducts : allProducts.filter(p => p.category === filterCat);
   })();
 
-  // ── Setup / Splash ────────────────────────────────────────────────────────
   if (isSetup) return (
-    <div style={{ minHeight: '100vh', backgroundColor: C.bg, display: 'flex', flexDirection: 'column' }}>
-
-      {/* Logo */}
-      <div style={{ padding: '56px 28px 24px' }}>
-        <span style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '22px', fontWeight: '900', color: C.accent, letterSpacing: '-1px', lineHeight: 1 }}>pickle</span>
-      </div>
-
-      {/* Form — sits below, blends with the fade */}
-      <div style={{ flex: 1, padding: '8px 28px 52px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-        <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '34px', color: C.text, marginBottom: '8px', fontWeight: '700', lineHeight: 1.2 }}>
-          don&apos;t forget the bread.
-        </p>
-        <p style={{ fontSize: '13px', color: C.dim, marginBottom: '32px', letterSpacing: '0.3px' }}>a grocery app for two.</p>
-
-        <form onSubmit={completeSetup} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <label style={labelStyle}>Your name</label>
-            <input
-              type="text" placeholder="e.g. Barbara" value={setupUser}
-              onChange={e => setSetupUser(e.target.value)} required autoFocus
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Household code</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="e.g. A3BX7K"
-                value={setupCode}
-                onChange={e => setSetupCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                maxLength={6}
-                required
-                style={{ ...inputStyle, flex: 1, textAlign: 'center', letterSpacing: '4px', fontWeight: '700', fontSize: '20px' }}
-              />
-              <button
-                type="button"
-                onClick={() => setSetupCode(genCode())}
-                style={{ padding: '0 16px', backgroundColor: C.accentDim, border: `1.5px solid ${C.accent}40`, borderRadius: '10px', color: C.accent, cursor: 'pointer', fontSize: '18px', flexShrink: 0 }}
-                title="Generate new code"
-              >↻</button>
-            </div>
-            <p style={{ fontSize: '12px', color: C.dim, marginTop: '8px', lineHeight: 1.6 }}>
-              New? Tap ↻ to generate a code, then share it with your partner.<br />
-              Already have one? Type it above.
-            </p>
-          </div>
-          <button type="submit" style={{ marginTop: '10px', width: '100%', padding: '16px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '900', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.5px' }}>
-            Get started
-          </button>
-          <button type="button" onClick={startDemo} style={{ width: '100%', padding: '14px', backgroundColor: 'transparent', color: C.accent, border: `1.5px solid ${C.accent}`, borderRadius: '14px', fontSize: '14px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.5px' }}>
-            Try the demo
-          </button>
-          <p style={{ fontSize: '12px', color: C.dim, margin: '-4px 0 0', textAlign: 'center', lineHeight: 1.6 }}>
-            Explore a sample household. Nothing is saved to the server.
-          </p>
-        </form>
-      </div>
-    </div>
+    <SetupScreen
+      C={C} inputStyle={inputStyle} labelStyle={labelStyle}
+      name={setupUser} code={setupCode}
+      onNameChange={setSetupUser} onCodeChange={setSetupCode}
+      onSubmit={completeSetup} onDemo={startDemo}
+    />
   );
 
-  // ── Home page ─────────────────────────────────────────────────────────────
   function goTo(t: Tab) { setTab(t); setShowHome(false); }
 
-  const today = DAYS[new Date().getDay()];
-
-  const demoPill = isDemo ? (
-    <div style={{ position: 'relative', zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '8px 16px', backgroundColor: '#1A1A1A', color: '#FFFFFF', fontSize: '12px', fontWeight: '700', letterSpacing: '0.3px' }}>
-      <span>Demo · sample data, nothing is saved</span>
-      <button type="button" onClick={e => { e.stopPropagation(); exitDemo(); }} style={{ padding: '4px 12px', backgroundColor: '#FFFFFF', color: '#1A1A1A', border: 'none', borderRadius: '12px', fontSize: '11px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit' }}>
-        Exit
-      </button>
-    </div>
-  ) : null;
+  const demoBanner = isDemo ? <DemoBanner onExit={exitDemo} /> : null;
 
   if (showHome) return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#F8F7F2', position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {demoPill}
-
-      {/* Foreground stickers — edges */}
-      <img src="/stk-strawberries.png"   alt="" style={{ position: 'absolute', top: '2%',  left: '-38px',  width: '116px', transform: 'rotate(-122deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 2 }} />
-      <img src="/stk-duck.png"           alt="" style={{ position: 'absolute', top: '4%',  right: '-22px', width: '96px',  transform: 'rotate(12deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: 2 }} />
-      <img src="/stk-pineapple.png"      alt="" style={{ position: 'absolute', top: '20%', right: '1%',    height: '90px', width: 'auto', transform: 'rotate(-6deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 2 }} />
-      <img src="/stk-star.png"           alt="" style={{ position: 'absolute', top: '38%', right: '9%',    width: '58px',  transform: 'rotate(-10deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 3 }} />
-      <img src="/stk-japanese-burst.png" alt="" style={{ position: 'absolute', top: '52%', left: '1%',     width: '72px',  transform: 'rotate(-8deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: 2 }} />
-      <img src="/stk-tomatoes-vine.png"  alt="" style={{ position: 'absolute', top: '50%', right: '-38px', width: '96px',  transform: 'rotate(-40deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 2 }} />
-      <img src="/stk-grapes.png"         alt="" style={{ position: 'absolute', top: '73%', left: '-6px',   width: '70px',  transform: 'rotate(-11deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-
-      {/* Background stickers — scattered, behind content */}
-      <img src="/stk-del-monte.png"    alt="" style={{ position: 'absolute', top: '12%',  left: '18%',  width: '70px',  opacity: 0.40, transform: 'rotate(-14deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-super-special.png"alt="" style={{ position: 'absolute', top: '8%',   right: '22%', width: '72px',  opacity: 0.38, transform: 'rotate(20deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-jello.png"        alt="" style={{ position: 'absolute', top: '28%',  left: '12%',  width: '68px',  opacity: 0.36, transform: 'rotate(10deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-pie.png"          alt="" style={{ position: 'absolute', top: '32%',  right: '14%', width: '82px',  opacity: 0.38, transform: 'rotate(-18deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-ohoh-apple.png"   alt="" style={{ position: 'absolute', top: '48%',  left: '30%',  width: '66px',  opacity: 0.36, transform: 'rotate(12deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-orange.png"       alt="" style={{ position: 'absolute', top: '44%',  right: '20%', width: '62px',  opacity: 0.36, transform: 'rotate(-8deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-dragonfruit.png"  alt="" style={{ position: 'absolute', top: '60%',  left: '22%',  width: '76px',  opacity: 0.38, transform: 'rotate(16deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-soymilk.png"      alt="" style={{ position: 'absolute', top: '62%',  right: '16%', width: '66px',  opacity: 0.36, transform: 'rotate(-12deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-big-sale.png"     alt="" style={{ position: 'absolute', top: '77%',  left: '40%',  width: '74px',  opacity: 0.38, transform: 'rotate(8deg)',   pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-      <img src="/stk-cool.png"         alt="" style={{ position: 'absolute', top: '82%',  right: '24%', width: '78px',  opacity: 0.36, transform: 'rotate(-16deg)', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }} />
-
-      {/* Whole page is tappable */}
-      <div onClick={() => goTo('shop')} style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', cursor: 'pointer', padding: '52px 24px 48px' }}>
-
-        {/* Center section — logo */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px' }}>
-
-          {/* Logo */}
-          <span style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '52px', fontWeight: '900', color: '#E91E8C', letterSpacing: '-2px', lineHeight: 1, textAlign: 'center', position: 'relative', zIndex: 2 }}>
-            pickle
-          </span>
-
-        </div>
-
-        {/* Daily message card — bottom */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '24px', padding: '28px 24px 24px', border: '1px solid rgba(224,221,214,0.8)' }}>
-            <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '20px', color: C.text, margin: '0 0 16px', fontWeight: '700', lineHeight: 1.35 }}>
-              {today.msg}
-            </p>
-            <a href={today.spotify} target="_blank" rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '9px 16px', backgroundColor: '#1DB954', borderRadius: '20px', textDecoration: 'none' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-              <span style={{ fontSize: '12px', fontWeight: '700', color: 'white', letterSpacing: '0.3px' }}>{today.song} — {today.artist}</span>
-            </a>
-          </div>
-
-          {/* Bottom hint */}
-          {toBuy.length === 0 ? (
-            <p style={{ fontSize: '12px', color: C.dim, margin: 0, textAlign: 'center', letterSpacing: '0.5px', fontWeight: '600' }}>
-              tap anywhere to start
-            </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'center', backgroundColor: '#FFD600', borderRadius: '20px', padding: '10px 22px', boxShadow: '0 3px 12px rgba(255,214,0,0.4)', cursor: 'pointer', gap: '3px' }}>
-              <span style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '13px', fontWeight: '900', color: '#1A1A00' }}>
-                {toBuy.length} item{toBuy.length === 1 ? '' : 's'} on the list
-              </span>
-              <span style={{ fontSize: '10px', fontWeight: '700', color: '#1A1A00', opacity: 0.65, letterSpacing: '0.8px', textTransform: 'uppercase' }}>tap to go</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <HomeScreen C={C} itemCount={toBuy.length} onOpen={() => goTo('shop')} banner={demoBanner} />
   );
 
-  // ── Main app ──────────────────────────────────────────────────────────────
+  // Main app
   return (
     <div style={{ minHeight: '100vh', backgroundColor: C.bg, paddingBottom: '32px', position: 'relative', zIndex: 0 }}
       onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-      {demoPill}
+      {demoBanner}
       <style>{`
         @keyframes pulse-fab { 0%,100% { box-shadow: 0 4px 20px rgba(27,95,173,0.45); } 50% { box-shadow: 0 4px 32px rgba(27,95,173,0.75); } }
         @keyframes slide-up { from { opacity:0; transform:translateY(12px);} to { opacity:1; transform:translateY(0);} }
@@ -1135,19 +886,9 @@ export default function App() {
         @keyframes bag-sway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
       `}</style>
 
-      {/* Background stickers — fixed, behind all content */}
-
-      <img src="/stk-jello.png"        alt="" style={{ position: 'fixed', top: '22%',  left: '-10px',  width: '90px',  opacity: 0.2, transform: 'rotate(-10deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      <img src="/stk-super-special.png"alt="" style={{ position: 'fixed', top: '34%',  right: '-8px',  width: '90px',  opacity: 0.2, transform: 'rotate(-16deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      <img src="/stk-pie.png"          alt="" style={{ position: 'fixed', top: '58%',  right: '-12px', width: '108px', opacity: 0.2, transform: 'rotate(12deg)',   pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      <img src="/stk-dragonfruit.png"  alt="" style={{ position: 'fixed', top: '72%',  left: '-8px',   width: '96px',  opacity: 0.2, transform: 'rotate(-18deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      <img src="/stk-japanese-burst.png"alt=""style={{ position: 'fixed', bottom: '4%',right: '-10px', width: '100px', opacity: 0.2, transform: 'rotate(10deg)',   pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      <img src="/stk-big-sale.png"     alt="" style={{ position: 'fixed', bottom: '4%',left: '-8px',   width: '90px',  opacity: 0.2, transform: 'rotate(-14deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      {/* Centre scatter */}
-      <img src="/stk-grapes.png"       alt="" style={{ position: 'fixed', top: '42%',  left: '58%',    width: '82px',  opacity: 0.2, transform: 'rotate(-12deg)',  pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      <img src="/stk-tomatoes-vine.png"alt="" style={{ position: 'fixed', top: '55%',  left: '28%',    width: '84px',  opacity: 0.2, transform: 'rotate(16deg)',   pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      <img src="/stk-pineapple.png"    alt="" style={{ position: 'fixed', top: '66%',  left: '55%',    height: '86px', width: 'auto', opacity: 0.2, transform: 'rotate(-8deg)', pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
-      <img src="/stk-soymilk.png"      alt="" style={{ position: 'fixed', top: '78%',  left: '35%',    width: '76px',  opacity: 0.2, transform: 'rotate(12deg)',   pointerEvents: 'none', userSelect: 'none', zIndex: -1 }} />
+      {BACKGROUND_STICKERS.map(st => (
+        <img key={st.src} src={st.src} alt="" style={{ position: 'fixed', pointerEvents: 'none', userSelect: 'none', ...st.style }} />
+      ))}
 
       {/* Header */}
       <header ref={headerRef} style={{ backgroundColor: C.bg, padding: '18px 20px 0', position: 'sticky', top: 0, zIndex: 20 }}>
@@ -1239,7 +980,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ══ SHOPPING MODE OVERLAY ════════════════════════════════════════ */}
+        {/* Shopping mode overlay */}
         {shopMode && (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: C.bg, zIndex: 150, overflowY: 'auto', paddingBottom: '80px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 12px', position: 'sticky', top: 0, backgroundColor: C.bg, zIndex: 2, borderBottom: `1px solid ${C.border}` }}>
@@ -1295,7 +1036,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ══ SHOP ═══════════════════════════════════════════════════════════ */}
+        {/* Shop */}
         {tab === 'shop' && (
           <div style={{ paddingTop: '8px' }}>
 
@@ -1471,7 +1212,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ══ FIND ═══════════════════════════════════════════════════════════ */}
+        {/* Find */}
         {tab === 'find' && (
           <div style={{ paddingTop: '16px' }}>
             {/* Search row */}
@@ -1506,249 +1247,33 @@ export default function App() {
                     <div style={{ fontSize: '13px', fontWeight: '800', letterSpacing: '0.5px', textTransform: 'uppercase', color: CAT[cat].accent, marginBottom: '10px' }}>
                       {CAT[cat].label}
                     </div>
-                    <ProductGrid products={allInCat} items={items} justAdded={justAdded} onAdd={addFromCatalog} onDelete={deleteCustomProduct} onRename={p => p.isCustom ? openRename(p.id, p.name, 'custom') : openRename(p.id, p.name, 'new', p.category, p.emoji)} recurring={recurring} onToggleRecurring={toggleRecurring} C={C} />
+                    <ProductGrid products={allInCat} items={items} justAdded={justAdded} onAdd={addFromCatalog} onRename={p => p.isCustom ? openRename(p.id, p.name, 'custom') : openRename(p.id, p.name, 'new', p.category, p.emoji)} recurring={recurring} onToggleRecurring={toggleRecurring} C={C} />
                   </div>
                 );
               })
             ) : catalogProducts.length === 0 ? (
               <Empty C={C} title="No results" sub="Try a different search or add it yourself" />
             ) : (
-              <ProductGrid products={catalogProducts} items={items} justAdded={justAdded} onAdd={addFromCatalog} onDelete={deleteCustomProduct} onRename={p => p.isCustom ? openRename(p.id, p.name, 'custom') : openRename(p.id, p.name, 'new', p.category, p.emoji)} recurring={recurring} onToggleRecurring={toggleRecurring} C={C} />
+              <ProductGrid products={catalogProducts} items={items} justAdded={justAdded} onAdd={addFromCatalog} onRename={p => p.isCustom ? openRename(p.id, p.name, 'custom') : openRename(p.id, p.name, 'new', p.category, p.emoji)} recurring={recurring} onToggleRecurring={toggleRecurring} C={C} />
             )}
           </div>
         )}
 
-        {/* ══ SPLIT ══════════════════════════════════════════════════════════ */}
+        {/* Split */}
         {tab === 'split' && (
-          <div style={{ paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-            {/* Spending card */}
-            <div role="button" tabIndex={0} onClick={() => setSpendingOpen(true)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSpendingOpen(true); } }} style={{ width: '100%', textAlign: 'left', backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: '20px', padding: '20px 22px', cursor: 'pointer', fontFamily: 'inherit' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <p style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase', color: C.text, margin: 0 }}>Spending</p>
-                <button onClick={e => { e.stopPropagation(); setBudgetInput(budget ? String(budget) : ''); setBudgetOpen(true); }} style={{ fontSize: '11px', color: C.text, backgroundColor: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700' }}>
-                  {budget ? 'Edit limit' : '+ Set limit'}
-                </button>
-              </div>
-
-              <p style={{ fontSize: '12px', color: C.text, fontWeight: '600', margin: '0 0 2px', letterSpacing: '0.3px' }}>{MONTHS_EN[now.getMonth()]} {now.getFullYear()}</p>
-              <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '40px', fontWeight: '700', color: C.text, margin: 0, lineHeight: 1 }}>
-                €{thisMonthTotal.toFixed(2)}
-              </p>
-
-              {monthDiffPct !== null && thisMonthTotal === 0 && (
-                <p style={{ fontSize: '12px', color: C.dim, fontWeight: '600', margin: '10px 0 0' }}>
-                  Nothing logged yet · {MONTHS_EN[lastMonthDate.getMonth()]}: €{lastMonthTotal.toFixed(0)}
-                </p>
-              )}
-              {monthDiffPct !== null && thisMonthTotal > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '800', color: monthDiffPct <= 0 ? C.success : C.danger }}>
-                    {monthDiffPct <= 0 ? '↓' : '↑'} {Math.abs(monthDiffPct)}%
-                  </span>
-                  <span style={{ fontSize: '12px', color: C.text, fontWeight: '600' }}>vs {MONTHS_EN[lastMonthDate.getMonth()]} · €{lastMonthTotal.toFixed(0)}</span>
-                </div>
-              )}
-
-              {budget && (
-                <div style={{ marginTop: '16px' }}>
-                  <div style={{ height: '10px', backgroundColor: C.surface2, borderRadius: '5px', overflow: 'hidden', marginBottom: '8px' }}>
-                    <div style={{ height: '100%', width: `${Math.min(budgetPct * 100, 100)}%`, backgroundColor: budgetColor, borderRadius: '5px', transition: 'width 0.4s ease' }} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '12px', color: budgetPct >= 1 ? C.danger : C.dim, fontWeight: budgetPct >= 1 ? '700' : '400' }}>
-                      {budgetPct >= 1 ? `Over by €${(thisMonthTotal - budget).toFixed(2)}` : `€${(budget - thisMonthTotal).toFixed(2)} left`}
-                    </span>
-                    <span style={{ fontSize: '12px', color: C.text, fontWeight: '600' }}>limit €{budget.toFixed(0)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Balance card */}
-            <div style={{ borderRadius: '20px', overflow: 'hidden', border: `1px solid ${C.border}` }}>
-              <div style={{ background: 'linear-gradient(135deg, #1B5FAD, #1A4F99)', padding: '28px 24px 20px' }}>
-                {Math.abs(balance) < 0.01 ? (
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '22px', color: '#FFFFFF', margin: '0 0 6px', fontWeight: '700' }}>All settled up</p>
-                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.75)' }}>Nobody owes anything</p>
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 12px', fontWeight: '700' }}>
-                      {balance > 0 ? `${partnerName || '...'} owes you` : `You owe ${partnerName || '...'}`}
-                    </p>
-                    <div style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '52px', fontWeight: '700', color: balance > 0 ? '#7FFFA8' : '#FFB3AE', lineHeight: 1 }}>
-                      €{Math.abs(balance).toFixed(2)}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Breakdown bar */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', backgroundColor: C.surface }}>
-                {[
-                  { label: userName, amount: totalByUser },
-                  { label: partnerName || '...', amount: totalByPartner },
-                ].map((person, i) => (
-                  <Fragment key={i}>
-                    {i === 1 && <div key="div" style={{ backgroundColor: C.border }} />}
-                    <div key={person.label} style={{ padding: '16px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '11px', color: C.text, letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px', fontWeight: '900' }}>{person.label}</div>
-                      <div style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '20px', color: C.accent, fontWeight: '700' }}>€{person.amount.toFixed(2)}</div>
-                    </div>
-                  </Fragment>
-                ))}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setExpenseOpen(true)} style={{ flex: 1, padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900', letterSpacing: '0.5px' }}>
-                + New
-              </button>
-              <button
-                onClick={() => receiptInputRef.current?.click()}
-                disabled={receiptLoading}
-                style={{ flex: 1, padding: '14px', backgroundColor: C.surface2, color: receiptLoading ? C.dim : C.text, border: `1px solid ${C.border}`, borderRadius: '12px', fontSize: '14px', cursor: receiptLoading ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: '700' }}
-              >
-                {receiptLoading ? '⏳ Reading…' : '📷 Scan'}
-              </button>
-              <input ref={receiptInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleReceiptImage} />
-              {expenses.length > 0 && (
-                <button onClick={settleUp} style={{ flex: 1, padding: '14px', backgroundColor: settleConfirm ? C.danger : C.surface2, color: settleConfirm ? '#fff' : C.text, border: `1px solid ${settleConfirm ? C.danger : C.border}`, borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700', transition: 'all 0.2s' }}>
-                  {settleConfirm ? 'Sure?' : 'Settle up'}
-                </button>
-              )}
-            </div>
-
-            {/* Expenses — receipt style */}
-            {expenses.length === 0 ? (
-              <Empty C={C} title="No expenses yet" sub={'Add a purchase to start\ntracking who paid what'} />
-            ) : (
-              <div style={{ backgroundColor: '#FEFEF8', border: `1px solid ${C.border}`, borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
-                {/* Receipt header */}
-                <div style={{ textAlign: 'center', padding: '18px 16px 14px', borderBottom: '1.5px dashed #C4C0B8' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '900', letterSpacing: '5px', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace", marginBottom: '2px' }}>PICKLE</div>
-                  <div style={{ fontSize: '9px', color: '#6B6863', letterSpacing: '3px', fontFamily: "var(--font-mono), 'Courier New', monospace", marginBottom: '4px' }}>PURCHASE LOG</div>
-                  <div style={{ fontSize: '9px', color: '#C4C0B8', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                </div>
-
-                {/* Expense rows */}
-                {expenses.map((exp, i) => {
-                  const name = resolvePaidBy(exp.paidBy) || exp.paidBy;
-                  const expDateKey = new Date(exp.createdAt).toDateString();
-                  const tripItems = bought.filter(it => new Date(it.updatedAt ?? it.createdAt).toDateString() === expDateKey);
-                  return (
-                    <button key={exp.id} onClick={() => openEditExpense(exp)} style={{ display: 'block', width: '100%', textAlign: 'left', backgroundColor: 'transparent', border: 'none', padding: '12px 18px', borderBottom: i < expenses.length - 1 ? '1px dashed #C4C0B8' : 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: '700', color: '#1A1A18', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: "var(--font-mono), 'Courier New', monospace", flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {exp.category ? getExpCatDisplay(exp.category).emoji + ' ' : ''}{name}
-                        </span>
-                        <span style={{ fontSize: '15px', fontWeight: '900', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace", flexShrink: 0 }}>
-                          €{exp.amount.toFixed(2)}
-                        </span>
-                      </div>
-                      {exp.note && <div style={{ fontSize: '10px', color: '#3A3A36', fontWeight: '700', marginTop: '2px', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>{exp.note}</div>}
-                      {tripItems.length > 0 && (
-                        <div style={{ fontSize: '9px', color: '#4A4A44', marginTop: '3px', fontFamily: "var(--font-mono), 'Courier New', monospace", lineHeight: 1.5 }}>
-                          {tripItems.slice(0, 6).map(it => it.name).join(', ')}{tripItems.length > 6 ? ` +${tripItems.length - 6}` : ''}
-                        </div>
-                      )}
-                      <div style={{ fontSize: '9px', color: '#6B6863', fontWeight: '600', marginTop: '2px', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>{fmtDate(exp.createdAt)}</div>
-                    </button>
-                  );
-                })}
-
-                {/* Total + breakdown + balance */}
-                <div style={{ padding: '14px 18px 18px', borderTop: '2px dashed #C4C0B8', backgroundColor: '#F8F7F2' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '3px', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>TOTAL</span>
-                    <span style={{ fontSize: '22px', fontWeight: '900', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>€{expenses.reduce((s, e) => s + e.amount, 0).toFixed(2)}</span>
-                  </div>
-
-                  <div style={{ borderTop: '1px dashed #C4C0B8', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
-                    {[
-                      { label: userName.toUpperCase(), amount: totalByUser },
-                      { label: (partnerName || '...').toUpperCase(), amount: totalByPartner },
-                    ].map(p => (
-                      <div key={p.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', color: '#1A1A18', fontWeight: '700', fontFamily: "var(--font-mono), 'Courier New', monospace", letterSpacing: '1px' }}>{p.label}</span>
-                        <span style={{ fontSize: '11px', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace", fontWeight: '700' }}>€{p.amount.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {Math.abs(balance) > 0.01 && (
-                    <div style={{ borderTop: '2px dashed #C4C0B8', paddingTop: '10px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '1px', fontFamily: "var(--font-mono), 'Courier New', monospace", color: balance > 0 ? '#2D7D46' : '#D93025' }}>
-                        {balance > 0
-                          ? `${(partnerName || '...').toUpperCase()} OWES YOU €${Math.abs(balance).toFixed(2)}`
-                          : `YOU OWE ${(partnerName || '...').toUpperCase()} €${Math.abs(balance).toFixed(2)}`}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Decorative barcode */}
-                  <div style={{ marginTop: '18px', display: 'flex', justifyContent: 'center', gap: '2px', opacity: 0.15 }}>
-                    {Array.from({ length: 32 }, (_, i) => (
-                      <div key={i} style={{ width: i % 4 === 0 ? '3px' : '1px', height: '22px', backgroundColor: '#1A1A18', borderRadius: '1px' }} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* History */}
-            {history.length > 0 && (
-              <div style={{ marginTop: '24px' }}>
-                <button
-                  onClick={() => setHistoryOpen(v => !v)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: C.surface, borderRadius: '12px', border: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                  <span style={{ fontSize: '12px', fontWeight: '900', color: C.text, letterSpacing: '1px', textTransform: 'uppercase' }}>
-                    History ({history.length} {history.length === 1 ? 'settlement' : 'settlements'})
-                  </span>
-                  <span style={{ fontSize: '16px', color: C.muted, transform: historyOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>˅</span>
-                </button>
-                {historyOpen && (
-                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {history.map(group => (
-                      <div key={group.settledAt} style={{ backgroundColor: C.surface, borderRadius: '14px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-                        <div style={{ padding: '10px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '700', color: C.text, letterSpacing: '0.5px' }}>
-                            {fmtDate(group.settledAt)}
-                          </span>
-                          <span style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '15px', fontWeight: '700', color: C.text }}>
-                            €{group.total.toFixed(2)}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          {group.expenses.map((exp, i) => {
-                            const name = resolvePaidBy(exp.paidBy) || exp.paidBy;
-                            return (
-                              <div key={exp.id} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: i < group.expenses.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                                <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '900', color: C.dim, flexShrink: 0 }}>
-                                  {name[0]?.toUpperCase()}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <span style={{ fontSize: '13px', color: C.text, fontWeight: '800' }}>{name}</span>
-                                  {exp.note && <span style={{ fontSize: '12px', color: C.dim, marginLeft: '8px' }}>{exp.note}</span>}
-                                </div>
-                                <span style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '14px', color: C.text, fontWeight: '700' }}>
-                                  €{exp.amount.toFixed(2)}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <SplitTab
+            C={C} expenses={expenses} history={history} bought={bought} budget={budget}
+            userName={userName} partnerName={partnerName}
+            totalByUser={totalByUser} totalByPartner={totalByPartner} balance={balance}
+            resolvePaidBy={resolvePaidBy}
+            settleConfirm={settleConfirm} receiptLoading={receiptLoading} receiptInputRef={receiptInputRef}
+            onOpenSpending={() => setSpendingOpen(true)}
+            onEditBudget={() => { setBudgetInput(budget ? String(budget) : ''); setBudgetOpen(true); }}
+            onNewExpense={() => setExpenseOpen(true)}
+            onReceiptImage={handleReceiptImage}
+            onSettle={settleUp}
+            onEditExpense={openEditExpense}
+          />
         )}
       </div>
 
@@ -2235,323 +1760,3 @@ export default function App() {
     </div>
   );
 }
-
-// ─── Components ───────────────────────────────────────────────────────────────
-
-function ItemCard({ item, onToggle, onDelete, onChangeQty, onRename, addedByColor, C }: { item: Item; onToggle: (id: string) => void; onDelete: (id: string) => void; onChangeQty: (id: string, delta: number) => void; onRename: (item: Item) => void; addedByColor: string; C: Theme }) {
-  const cfg = CAT[item.category];
-  const lastTapRef = useRef<{ time: number; timer: ReturnType<typeof setTimeout> } | null>(null);
-  const qty = parseInt(item.quantity || '1', 10);
-
-  return (
-    <div style={{ background: `linear-gradient(${cfg.bg}, ${cfg.bg}), ${C.surface}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px', border: `1.5px solid ${cfg.accent}60`, borderLeft: `4px solid ${addedByColor}`, opacity: item.bought ? 0.45 : 1, boxShadow: '0 2px 8px rgba(0,0,0,0.10)' }}>
-      <button onClick={() => onToggle(item.id)} style={{ width: '24px', height: '24px', borderRadius: '50%', border: `2px solid ${item.bought ? cfg.accent : C.border}`, backgroundColor: item.bought ? cfg.accent : C.surface2, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-        {item.bought && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7.5L8 2.5" stroke="#0A0A0A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-      </button>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span
-          onClick={e => {
-            e.stopPropagation();
-            if (item.bought) return;
-            const now2 = Date.now();
-            if (lastTapRef.current && now2 - lastTapRef.current.time < 380) {
-              clearTimeout(lastTapRef.current.timer);
-              lastTapRef.current = null;
-              onRename(item);
-              return;
-            }
-            if (lastTapRef.current) clearTimeout(lastTapRef.current.timer);
-            const timer = setTimeout(() => { lastTapRef.current = null; }, 380);
-            lastTapRef.current = { time: now2, timer };
-          }}
-          style={{ fontSize: '15px', color: C.text, textDecoration: item.bought ? 'line-through' : 'none', fontWeight: '700', cursor: 'default' }}
-        >
-          {item.name}
-        </span>
-        {item.notes && <p style={{ fontSize: '12px', color: C.dim, margin: '3px 0 0', lineHeight: 1.4 }}>{item.notes}</p>}
-      </div>
-
-      {!item.bought && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-          <button
-            onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); qty <= 1 ? onDelete(item.id) : onChangeQty(item.id, -1); }}
-            onClick={e => { e.stopPropagation(); qty <= 1 ? onDelete(item.id) : onChangeQty(item.id, -1); }}
-            style={{ width: '24px', height: '24px', borderRadius: '6px', border: `1px solid ${C.danger}60`, backgroundColor: C.surface2, color: C.danger, fontSize: '17px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0, fontFamily: 'inherit' }}
-          >−</button>
-          <span style={{ fontSize: '13px', fontWeight: '700', color: C.dim, minWidth: '18px', textAlign: 'center' }}>{qty}</span>
-          <button
-            onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onChangeQty(item.id, 1); }}
-            onClick={e => { e.stopPropagation(); onChangeQty(item.id, 1); }}
-            style={{ width: '24px', height: '24px', borderRadius: '6px', border: `1px solid ${C.danger}60`, backgroundColor: C.surface2, color: C.danger, fontSize: '17px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0, fontFamily: 'inherit' }}
-          >+</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ProductGrid({ products, items, justAdded, onAdd, onDelete, onRename, recurring, onToggleRecurring, C }: {
-  products: (Product & { isCustom?: boolean; emoji?: string })[];
-  items: Item[];
-  justAdded: Set<string>;
-  onAdd: (p: Product & { emoji?: string }) => void;
-  onDelete?: (id: string) => void;
-  onRename?: (p: Product & { isCustom?: boolean; emoji?: string }) => void;
-  recurring?: Record<string, { category: Category; emoji: string }>;
-  onToggleRecurring?: (name: string, category: Category, emoji: string) => void;
-  C: Theme;
-}) {
-  const lastTap = useRef<{ id: string; time: number; timer: ReturnType<typeof setTimeout> } | null>(null);
-
-  function handleTap(p: Product & { isCustom?: boolean; emoji?: string }, now: number) {
-    if (onRename) {
-      if (lastTap.current?.id === p.id && now - lastTap.current.time < 350) {
-        clearTimeout(lastTap.current.timer);
-        lastTap.current = null;
-        onRename(p);
-        return;
-      }
-      if (lastTap.current) clearTimeout(lastTap.current.timer);
-      const timer = setTimeout(() => { lastTap.current = null; onAdd(p); }, 350);
-      lastTap.current = { id: p.id, time: now, timer };
-      return;
-    }
-    onAdd(p);
-  }
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-      {products.map(p => {
-        const inList = items.some(i => !i.bought && i.name === p.name);
-        const added = justAdded.has(p.id);
-        const starred = !!recurring?.[p.name];
-        const cfg = CAT[p.category];
-        return (
-          <div key={p.id} style={{ position: 'relative' }}>
-            <button onClick={e => handleTap(p, e.timeStamp)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 8px', borderRadius: '12px', border: `1.5px solid ${inList ? cfg.accent : C.border}`, backgroundColor: added ? cfg.bg : inList ? cfg.bg : C.surface, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.18s', minHeight: '52px' }}>
-              <span style={{ fontSize: '13px', color: added ? cfg.text : inList ? cfg.text : C.text, textAlign: 'center', lineHeight: 1.35, fontWeight: inList ? '700' : '500' }}>
-                {added ? '✓' : p.name}
-              </span>
-            </button>
-            {onToggleRecurring && (
-              <button
-                onClick={e => { e.stopPropagation(); onToggleRecurring(p.name, p.category, p.emoji || ''); }}
-                style={{ position: 'absolute', top: '4px', right: '4px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: starred ? '#F97316' : C.muted, fontSize: '11px', padding: '2px', lineHeight: 1, opacity: starred ? 1 : 0.45 }}
-              >
-                {starred ? '★' : '☆'}
-              </button>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function Chip({ label, selected, onClick, accent, C }: { label: string; selected: boolean; onClick: () => void; accent?: string; C: Theme }) {
-  return (
-    <button onClick={onClick} style={{ padding: '7px 16px', borderRadius: '20px', border: `1.5px solid ${selected ? (accent || C.accent) : C.border}`, backgroundColor: selected ? (accent ? `${accent}4D` : C.accentDim) : C.surface2, color: selected ? (accent || C.accent) : C.text, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: selected ? '700' : '500', whiteSpace: 'nowrap', transition: 'all 0.12s', flexShrink: 0 }}>
-      {label}
-    </button>
-  );
-}
-
-function Drawer({ onClose, title, children, C }: { onClose: () => void; title: string; children: React.ReactNode; C: Theme }) {
-  return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', backdropFilter: 'blur(6px)' }}>
-      <div style={{ backgroundColor: C.surface, borderRadius: '24px 24px 0 0', padding: '8px 0 0', width: '100%', maxWidth: '540px', maxHeight: '92vh', overflowY: 'auto', border: `1px solid ${C.border}`, borderBottom: 'none' }}>
-        <div style={{ width: '36px', height: '4px', backgroundColor: C.border, borderRadius: '2px', margin: '0 auto 16px' }} />
-        <div style={{ padding: '0 20px 52px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h2 style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '20px', color: C.text, fontWeight: '700', margin: 0 }}>{title}</h2>
-            <button onClick={onClose} style={{ width: '32px', height: '32px', fontSize: '20px', color: C.text, border: `1px solid ${C.border}`, backgroundColor: C.surface2, borderRadius: '8px', cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
-          </div>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SpendingDetail({ allExp, C, now, budget, userName, partnerName, initialMonth }: { allExp: Expense[]; C: Theme; now: Date; budget: number | null; userName: string; partnerName: string; initialMonth?: { year: number; month: number } }) {
-  const [dm, setDm] = useState(initialMonth ?? { year: now.getFullYear(), month: now.getMonth() });
-
-  const canNext = dm.year < now.getFullYear() || (dm.year === now.getFullYear() && dm.month < now.getMonth());
-  const prevMonth = () => setDm(d => d.month === 0 ? { year: d.year - 1, month: 11 } : { ...d, month: d.month - 1 });
-  const nextMonth = () => { if (canNext) setDm(d => d.month === 11 ? { year: d.year + 1, month: 0 } : { ...d, month: d.month + 1 }); };
-
-  const monthStart = new Date(dm.year, dm.month, 1).getTime();
-  const monthEnd = new Date(dm.year, dm.month + 1, 0, 23, 59, 59, 999).getTime();
-  const monthExp = allExp.filter(e => e.createdAt >= monthStart && e.createdAt <= monthEnd);
-  const byDay: Record<number, number> = {};
-  const byDayUser: Record<number, number> = {};
-  const byDayPartner: Record<number, number> = {};
-  function rPB(paidBy: string) { return paidBy === 'user' ? userName : paidBy === 'partner' ? (partnerName || '') : paidBy; }
-  monthExp.forEach(e => {
-    const d = new Date(e.createdAt).getDate();
-    byDay[d] = (byDay[d] || 0) + e.amount;
-    if (rPB(e.paidBy) === userName) byDayUser[d] = (byDayUser[d] || 0) + e.amount;
-    else byDayPartner[d] = (byDayPartner[d] || 0) + e.amount;
-  });
-  const monthTotal = monthExp.reduce((s, e) => s + e.amount, 0);
-  const monthByUser = monthExp.filter(e => rPB(e.paidBy) === userName).reduce((s, e) => s + e.amount, 0);
-  const monthByPartner = monthExp.filter(e => rPB(e.paidBy) === (partnerName || '')).reduce((s, e) => s + e.amount, 0);
-
-  const firstDow = (new Date(dm.year, dm.month, 1).getDay() + 6) % 7;
-  const daysInMonth = new Date(dm.year, dm.month + 1, 0).getDate();
-
-  const chartMonths = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-    const s = d.getTime();
-    const e2 = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
-    const total = allExp.filter(e => e.createdAt >= s && e.createdAt <= e2).reduce((sum, e) => sum + e.amount, 0);
-    return { year: d.getFullYear(), month: d.getMonth(), total };
-  });
-  const maxBar = Math.max(...chartMonths.map(m => m.total), 1);
-
-  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const WEEK = ['Mo','Tu','We','Th','Fr','Sa','Su'];
-
-  const budgetPct = budget && monthTotal ? Math.min(monthTotal / budget, 1) : 0;
-  const budgetColor = budgetPct >= 0.9 ? '#FF5050' : budgetPct >= 0.7 ? '#F59E0B' : '#4ADE80';
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-
-      {/* Month navigator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button onClick={prevMonth} style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${C.border}`, backgroundColor: C.surface2, color: C.text, fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <p style={{ fontSize: '12px', color: C.dim, margin: '0 0 2px', letterSpacing: '0.3px' }}>{MONTHS_EN[dm.month]} {dm.year}</p>
-          <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '32px', fontWeight: '700', color: C.text, margin: 0, lineHeight: 1 }}>€{monthTotal.toFixed(2)}</p>
-          {monthTotal > 0 && (
-            <p style={{ fontSize: '12px', color: C.dim, margin: '6px 0 0' }}>
-              {userName} €{monthByUser.toFixed(2)} · {partnerName || '...'} €{monthByPartner.toFixed(2)}
-            </p>
-          )}
-          {budget && (
-            <p style={{ fontSize: '12px', color: budgetPct >= 1 ? '#FF5050' : C.dim, margin: '4px 0 0', fontWeight: budgetPct >= 1 ? '700' : '400' }}>
-              {budgetPct >= 1 ? `over limit by €${(monthTotal - budget).toFixed(2)}` : `€${(budget - monthTotal).toFixed(2)} under limit`}
-            </p>
-          )}
-        </div>
-        <button onClick={nextMonth} disabled={!canNext} style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${C.border}`, backgroundColor: C.surface2, color: canNext ? C.text : C.muted, fontSize: '18px', cursor: canNext ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
-      </div>
-
-      {/* Calendar */}
-      <div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', marginBottom: '6px' }}>
-          {WEEK.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '700', color: C.dim }}>{d}</div>)}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px' }}>
-          {Array.from({ length: firstDow }, (_, i) => <div key={`e${i}`} />)}
-          {Array.from({ length: daysInMonth }, (_, i) => {
-            const day = i + 1;
-            const amt = byDay[day];
-            const hasUser = !!byDayUser[day];
-            const hasPartner = !!byDayPartner[day];
-            const both = hasUser && hasPartner;
-            const isToday = dm.year === now.getFullYear() && dm.month === now.getMonth() && day === now.getDate();
-            const dotColor = both ? '#9B59D0' : hasUser ? '#1B5FAD' : hasPartner ? '#2D7D46' : null;
-            const bgColor = both ? 'rgba(155,89,208,0.13)' : hasUser ? 'rgba(27,95,173,0.13)' : hasPartner ? 'rgba(45,125,70,0.13)' : isToday ? C.surface2 : 'transparent';
-            const borderColor = both ? '#9B59D055' : hasUser ? '#1B5FAD55' : hasPartner ? '#2D7D4655' : isToday ? C.border : 'transparent';
-            return (
-              <div key={day} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '46px', borderRadius: '10px', backgroundColor: bgColor, border: `1.5px solid ${borderColor}`, padding: '4px 2px', gap: '2px' }}>
-                <span style={{ fontSize: '12px', color: dotColor ?? (isToday ? C.text : C.dim), fontWeight: amt || isToday ? '700' : '400', lineHeight: 1 }}>{day}</span>
-                {amt && <span style={{ fontSize: '9px', color: dotColor ?? C.dim, fontWeight: '800', lineHeight: 1 }}>€{amt % 1 === 0 ? Math.round(amt) : amt.toFixed(2)}</span>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Donut chart — category breakdown */}
-      {monthExp.length > 0 && (() => {
-        const bycat: Record<string, number> = {};
-        for (const e of monthExp) {
-          const cat = e.category || 'other';
-          bycat[cat] = (bycat[cat] || 0) + e.amount;
-        }
-        const R = 50, cx = 65, cy = 65, strokeW = 20;
-        const circ = 2 * Math.PI * R;
-        let offsetFrac = 0;
-        const slices = Object.entries(bycat)
-          .sort((a, b) => b[1] - a[1])
-          .map(([cat, amt]) => {
-            const pct = amt / monthTotal;
-            const dashLen = pct * circ;
-            const dashOffset = -(offsetFrac * circ);
-            offsetFrac += pct;
-            return { cat, amt, pct, dashLen, dashOffset };
-          });
-
-        return (
-          <div>
-            <p style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: C.dim, margin: '0 0 14px' }}>By category</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <svg width="130" height="130" viewBox="0 0 130 130" style={{ flexShrink: 0 }}>
-                {slices.map(s => (
-                  <circle key={s.cat} cx={cx} cy={cy} r={R}
-                    fill="none" stroke={getExpCatDisplay(s.cat).accent}
-                    strokeWidth={strokeW}
-                    strokeDasharray={`${s.dashLen} ${circ - s.dashLen}`}
-                    strokeDashoffset={s.dashOffset}
-                    style={{ transform: 'rotate(-90deg)', transformOrigin: `${cx}px ${cy}px` }}
-                  />
-                ))}
-              </svg>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', flex: 1 }}>
-                {slices.map(s => {
-                  const d = getExpCatDisplay(s.cat);
-                  return (
-                    <div key={s.cat} style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <div style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: d.accent, flexShrink: 0 }} />
-                      <span style={{ fontSize: '12px', color: C.text, fontWeight: '700', flex: 1 }}>{d.emoji} {d.label}</span>
-                      <span style={{ fontSize: '11px', color: C.dim, fontFamily: "var(--font-mono), 'Courier New', monospace" }}>€{s.amt.toFixed(0)}</span>
-                      <span style={{ fontSize: '12px', color: C.dim, fontWeight: '600' }}>{Math.round(s.pct * 100)}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Monthly bar chart */}
-      <div>
-        <p style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: C.dim, margin: '0 0 16px' }}>Last 6 months</p>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
-          {chartMonths.map(m => {
-            const isSel = m.year === dm.year && m.month === dm.month;
-            const barH = m.total > 0 ? Math.max(Math.round((m.total / maxBar) * 88), 6) : 0;
-            return (
-              <div key={`${m.year}-${m.month}`} onClick={() => setDm({ year: m.year, month: m.month })} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                <span style={{ fontSize: '9px', color: isSel ? C.accent : C.dim, fontWeight: '700', height: '14px', display: 'flex', alignItems: 'flex-end' }}>
-                  {m.total > 0 ? `€${Math.round(m.total)}` : ''}
-                </span>
-                <div style={{ width: '100%', height: '88px', display: 'flex', alignItems: 'flex-end' }}>
-                  <div style={{ width: '100%', height: `${barH}px`, backgroundColor: isSel ? C.accent : C.surface2, borderRadius: '4px 4px 0 0', transition: 'all 0.25s ease' }} />
-                </div>
-                <span style={{ fontSize: '9px', color: isSel ? C.accent : C.dim, fontWeight: isSel ? '700' : '400' }}>{MONTHS_SHORT[m.month]}</span>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{ height: '1px', backgroundColor: C.border }} />
-      </div>
-
-    </div>
-  );
-}
-
-function Empty({ title, sub, C }: { title: string; sub: string; C: Theme }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '72px 24px 40px' }}>
-      <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '18px', color: C.text, margin: '0 0 10px', fontWeight: '700' }}>{title}</p>
-      <p style={{ fontSize: '14px', color: C.dim, margin: 0, lineHeight: 1.7, whiteSpace: 'pre-line' }}>{sub}</p>
-    </div>
-  );
-}
-
