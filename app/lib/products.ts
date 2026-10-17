@@ -58,7 +58,7 @@ export type Product = {
 
 export const PRODUCTS: Product[] = [
 
-  // ── Produce ───────────────────────────────────────────────────────────────
+  // Produce
   { id: 'p01',  name: 'Μήλα',                 category: 'produce', emoji: '🍎' },
   { id: 'p02',  name: 'Μπανάνες',             category: 'produce', emoji: '🍌' },
   { id: 'p03',  name: 'Πορτοκάλια',           category: 'produce', emoji: '🍊' },
@@ -128,7 +128,7 @@ export const PRODUCTS: Product[] = [
   { id: 'pt58', name: 'Δαμάσκηνα αποξηραμένα',category: 'produce', emoji: '🍇' },
   { id: 'pt59', name: 'Cranberries',           category: 'produce', emoji: '🍓' },
 
-  // ── Dairy & Eggs ──────────────────────────────────────────────────────────
+  // Dairy & Eggs
   { id: 'd01',  name: 'Γάλα',                 category: 'dairy', emoji: '🥛' },
   { id: 'd02',  name: 'Γάλα εβαπορέ',         category: 'dairy', emoji: '🥛' },
   { id: 'd03',  name: 'Αυγά',                 category: 'dairy', emoji: '🥚' },
@@ -153,7 +153,7 @@ export const PRODUCTS: Product[] = [
   { id: 'd22',  name: 'Ταλαγάνι',             category: 'dairy', emoji: '🧀' },
   { id: 'd23',  name: 'Χαλούμι',              category: 'dairy', emoji: '🧀' },
 
-  // ── Meat ──────────────────────────────────────────────────────────────────
+  // Meat
   { id: 'm01',  name: 'Κοτόπουλο φιλέτο',     category: 'meat', emoji: '🍗' },
   { id: 'm02',  name: 'Κοτόπουλο μπούτι',    category: 'meat', emoji: '🍗' },
   { id: 'm03',  name: 'Κοτόπουλο φτερούγες',  category: 'meat', emoji: '🍗' },
@@ -170,7 +170,7 @@ export const PRODUCTS: Product[] = [
   { id: 'm14',  name: 'Λουκάνικο',            category: 'meat', emoji: '🌭' },
   { id: 'm15',  name: 'Μπιφτέκι',            category: 'meat', emoji: '🥩' },
 
-  // ── Fish & Seafood ────────────────────────────────────────────────────────
+  // Fish & Seafood
   { id: 'f01',  name: 'Λαβράκι',              category: 'fish', emoji: '🐟' },
   { id: 'f02',  name: 'Τσιπούρα',             category: 'fish', emoji: '🐟' },
   { id: 'f03',  name: 'Σολομός',              category: 'fish', emoji: '🐟' },
@@ -194,7 +194,7 @@ export const PRODUCTS: Product[] = [
   { id: 'f21',  name: 'Καβούρι',              category: 'fish', emoji: '🦀' },
   { id: 'f22',  name: 'Αστακός',              category: 'fish', emoji: '🦞' },
 
-  // ── Deli ──────────────────────────────────────────────────────────────────
+  // Deli
   { id: 'dl1',  name: 'Ζαμπόν',               category: 'deli', emoji: '🥩' },
   { id: 'dl2',  name: 'Πάριζα',               category: 'deli', emoji: '🥩' },
   { id: 'dl3',  name: 'Μπέικον',              category: 'deli', emoji: '🥓' },
@@ -206,7 +206,7 @@ export const PRODUCTS: Product[] = [
   { id: 'dl9',  name: 'Παστουρμάς',           category: 'deli', emoji: '🥩' },
   { id: 'dl10', name: 'Καπνιστό κοτόπουλο',   category: 'deli', emoji: '🥩' },
 
-  // ── Bakery ────────────────────────────────────────────────────────────────
+  // Bakery
   { id: 'bk1',  name: 'Ψωμί',                 category: 'bakery', emoji: '🍞' },
   { id: 'bk2',  name: 'Ψωμί για τοστ',        category: 'bakery', emoji: '🍞' },
   { id: 'bk3',  name: 'Μπαγκέτα',             category: 'bakery', emoji: '🥖' },
@@ -219,7 +219,7 @@ export const PRODUCTS: Product[] = [
   { id: 'bk10', name: 'Κριτσίνια',            category: 'bakery', emoji: '🥖' },
   { id: 'bk11', name: 'Crackers',             category: 'bakery', emoji: '🫓' },
 
-  // ── Pasta ─────────────────────────────────────────────────────────────────
+  // Pasta
   { id: 'pa01', name: 'Σπαγγέτι',             category: 'pasta', emoji: '🍝' },
   { id: 'pa02', name: 'Πένες',                category: 'pasta', emoji: '🍝' },
   { id: 'pa03', name: 'Ριγκατόνι',            category: 'pasta', emoji: '🍝' },
@@ -238,7 +238,7 @@ export const PRODUCTS: Product[] = [
   { id: 'pa17', name: 'Ραβιόλι',               category: 'pasta', emoji: '🍝' },
   { id: 'pa18', name: 'Νιόκι',               category: 'pasta', emoji: '🍝' },
 
-  // ── Rice & Grains ─────────────────────────────────────────────────────────
+  // Rice & Grains
   { id: 'gr01', name: 'Ρύζι',                 category: 'grains', emoji: '🍚' },
   { id: 'gr02', name: 'Ρύζι Basmati',        category: 'grains', emoji: '🍚' },
   { id: 'gr03', name: 'Ρύζι Arborio',        category: 'grains', emoji: '🍚' },
@@ -252,7 +252,7 @@ export const PRODUCTS: Product[] = [
   { id: 'gr11', name: 'Corn Flakes',           category: 'grains', emoji: '🌾' },
   { id: 'gr12', name: 'Muesli',                category: 'grains', emoji: '🌾' },
 
-  // ── Legumes ───────────────────────────────────────────────────────────────
+  // Legumes
   { id: 'lg1',  name: 'Φακές',                category: 'legumes', emoji: '🫘' },
   { id: 'lg3',  name: 'Ρεβύθια',              category: 'legumes', emoji: '🫘' },
   { id: 'lg4',  name: 'Φασόλια',              category: 'legumes', emoji: '🫘' },
@@ -260,7 +260,7 @@ export const PRODUCTS: Product[] = [
   { id: 'lg7',  name: 'Φάβα',                 category: 'legumes', emoji: '🫘' },
   { id: 'lg8',  name: 'Σόγια',                category: 'legumes', emoji: '🫘' },
 
-  // ── Oils and Sauces ───────────────────────────────────────────────────────
+  // Oils and Sauces
   { id: 'pt01', name: 'Ελαιόλαδο',            category: 'oils', emoji: '🫙' },
   { id: 'pt02', name: 'Ηλιέλαιο',             category: 'oils', emoji: '🫙' },
   { id: 'pt03', name: 'Λάδι καρύδας',         category: 'oils', emoji: '🫙' },
@@ -281,7 +281,7 @@ export const PRODUCTS: Product[] = [
   { id: 'pt35', name: 'Σάλτσα funghi',        category: 'oils', emoji: '🫙' },
   { id: 'pt36', name: 'η μόνη ωραία σάλτσα της Barilla', category: 'oils', emoji: '🫙' },
 
-  // ── Κονσέρβες ─────────────────────────────────────────────────────────────
+  // Κονσέρβες
   { id: 'pt13', name: 'Ντομάτες κονσέρβα',    category: 'canned', emoji: '🥫' },
   { id: 'pt14', name: 'Πελτές ντομάτας',      category: 'canned', emoji: '🥫' },
   { id: 'pt15', name: 'Passata',               category: 'canned', emoji: '🥫' },
@@ -295,7 +295,7 @@ export const PRODUCTS: Product[] = [
   { id: 'pt45', name: 'Μελιτζανοσαλάτα',      category: 'canned', emoji: '🫙' },
   { id: 'pt46', name: 'Χούμους',              category: 'canned', emoji: '🫙' },
 
-  // ── Μπαχαρικά ─────────────────────────────────────────────────────────────
+  // Μπαχαρικά
   { id: 'pt22', name: 'Αλάτι',                category: 'spices', emoji: '🧂' },
   { id: 'pt23', name: 'Πιπέρι',               category: 'spices', emoji: '🌶️' },
   { id: 'pt24', name: 'Ρίγανη',               category: 'spices', emoji: '🌿' },
@@ -320,7 +320,7 @@ export const PRODUCTS: Product[] = [
   { id: 'pt37', name: 'Σκόρδο σκόνη',         category: 'spices', emoji: '🌿' },
   { id: 'pt38', name: 'Κρεμμύδι σκόνη',       category: 'spices', emoji: '🌿' },
 
-  // ── Spreads & Nuts ────────────────────────────────────────────────────────
+  // Spreads & Nuts
   { id: 'pt37', name: 'Μέλι',                 category: 'spreads', emoji: '🍯' },
   { id: 'pt38', name: 'Μαρμελάδα',            category: 'spreads', emoji: '🫙' },
   { id: 'pt62', name: 'Μαρμελάδα φράουλα',   category: 'spreads', emoji: '🍓' },
@@ -342,7 +342,7 @@ export const PRODUCTS: Product[] = [
   { id: 'pt53', name: 'Κολοκυθόσποροι',       category: 'spreads', emoji: '🌱' },
   { id: 'pt54', name: 'Σουσάμι',              category: 'spreads', emoji: '🌱' },
   { id: 'pt55', name: 'Λιναρόσποροι',         category: 'spreads', emoji: '🌱' },
-  // ── Baking ────────────────────────────────────────────────────────────────
+  // Baking
   { id: 'pt60', name: 'Αλεύρι',               category: 'baking', emoji: '🌾' },
   { id: 'pt61', name: 'Ζάχαρη',               category: 'baking', emoji: '🍬' },
   { id: 'pt62', name: 'Baking powder',         category: 'baking', emoji: '🧁' },
@@ -356,7 +356,7 @@ export const PRODUCTS: Product[] = [
   { id: 'pt70', name: 'Φύλλο σφολιάτας',      category: 'baking', emoji: '🥐' },
   { id: 'pt71', name: 'Ζελατίνη',             category: 'baking', emoji: '🧁' },
 
-  // ── Snacks ────────────────────────────────────────────────────────────────
+  // Snacks
   { id: 'sn01', name: 'Πατατάκια',            category: 'snacks', emoji: '🍟' },
   { id: 'sn03', name: 'Popcorn',              category: 'snacks', emoji: '🍿' },
   { id: 'sn04', name: 'Μπισκότα',             category: 'snacks', emoji: '🍪' },
@@ -367,7 +367,7 @@ export const PRODUCTS: Product[] = [
   { id: 'sn11', name: 'Καραμέλες',            category: 'snacks', emoji: '🍬' },
   { id: 'sn12', name: 'Τσίχλες',              category: 'snacks', emoji: '🍬' },
 
-  // ── Frozen ────────────────────────────────────────────────────────────────
+  // Frozen
   { id: 'fr01', name: 'Αρακάς κατεψυγμένος',  category: 'frozen', emoji: '🫛' },
   { id: 'fr02', name: 'Φασολάκια κατεψυγμένα',category: 'frozen', emoji: '🫛' },
   { id: 'fr03', name: 'Σπανάκι κατεψυγμένο',  category: 'frozen', emoji: '🥬' },
@@ -387,7 +387,7 @@ export const PRODUCTS: Product[] = [
   { id: 'fr17', name: 'Φρούτα κατεψυγμένα',   category: 'frozen', emoji: '🍓' },
   { id: 'fr18', name: 'Παγωτό',               category: 'frozen', emoji: '🍦' },
 
-  // ── Water & Sodas ─────────────────────────────────────────────────────────
+  // Water & Sodas
   { id: 'dr01', name: 'Νερό',                 category: 'water', emoji: '💧' },
   { id: 'dr30', name: 'Νερό ανθρακούχο',      category: 'water', emoji: '💧' },
   { id: 'dr08', name: 'Coca-Cola',             category: 'water', emoji: '🥤' },
@@ -413,7 +413,7 @@ export const PRODUCTS: Product[] = [
   { id: 'dr46', name: 'Monster',             category: 'water', emoji: '🥤' },
   { id: 'dr47', name: 'Burn',                category: 'water', emoji: '🥤' },
 
-  // ── Juices ────────────────────────────────────────────────────────────────
+  // Juices
   { id: 'dr03', name: 'Χυμός πορτοκάλι',      category: 'juices', emoji: '🧃' },
   { id: 'dr02', name: 'Χυμός πολυφρούτων',    category: 'juices', emoji: '🧃' },
   { id: 'dr04', name: 'Χυμός μήλου',          category: 'juices', emoji: '🧃' },
@@ -426,7 +426,7 @@ export const PRODUCTS: Product[] = [
   { id: 'dr52', name: 'Χυμός γκρέιπφρουτ',   category: 'juices', emoji: '🧃' },
   { id: 'dr53', name: 'Χυμός λεμόνι',         category: 'juices', emoji: '🧃' },
 
-  // ── Coffee & Tea ──────────────────────────────────────────────────────────
+  // Coffee & Tea
   { id: 'dr13', name: 'Ελληνικός καφές',      category: 'coffee', emoji: '☕' },
   { id: 'dr14', name: 'Nescafé',              category: 'coffee', emoji: '☕' },
   { id: 'dr15', name: 'Καφές φίλτρου',        category: 'coffee', emoji: '☕' },
@@ -444,7 +444,7 @@ export const PRODUCTS: Product[] = [
   { id: 'dr62', name: 'Φασκόμηλο',            category: 'coffee', emoji: '🍵' },
   { id: 'dr19', name: 'Τσάι βοτάνων',         category: 'coffee', emoji: '🍵' },
 
-  // ── Alcohol ───────────────────────────────────────────────────────────────
+  // Alcohol
   { id: 'dr20', name: 'Κρασί κόκκινο',        category: 'alcohol', emoji: '🍷' },
   { id: 'dr21', name: 'Κρασί λευκό',          category: 'alcohol', emoji: '🍾' },
   { id: 'dr22', name: 'Κρασί ροζέ',           category: 'alcohol', emoji: '🍷' },
@@ -467,7 +467,7 @@ export const PRODUCTS: Product[] = [
   { id: 'dr73', name: 'Baileys',              category: 'alcohol', emoji: '🥃' },
   { id: 'dr74', name: 'Kahlúa',              category: 'alcohol', emoji: '🥃' },
 
-  // ── Hygiene ───────────────────────────────────────────────────────────────
+  // Hygiene
   { id: 'hy01', name: 'Σαμπουάν',             category: 'hygiene', emoji: '🧴' },
   { id: 'hy02', name: 'Μαλακτική κρέμα',      category: 'hygiene', emoji: '🧴' },
   { id: 'hy03', name: 'Βαφή μαλλιών',         category: 'hygiene', emoji: '🧴' },
@@ -494,7 +494,7 @@ export const PRODUCTS: Product[] = [
   { id: 'hy24', name: 'Χαρτομάντηλα',         category: 'hygiene', emoji: '🤧' },
   { id: 'hy25', name: 'Μωρομάντηλα',          category: 'hygiene', emoji: '✨' },
 
-  // ── Cleaning ──────────────────────────────────────────────────────────────
+  // Cleaning
   { id: 'cl01', name: 'Υγρό πιάτων',          category: 'cleaning', emoji: '🧼' },
   { id: 'cl02', name: 'Ταμπλέτες πλυντηρίου πιάτων', category: 'cleaning', emoji: '✨' },
   { id: 'cl03', name: 'Σκόνη πλυντηρίου',     category: 'cleaning', emoji: '🫧' },
@@ -515,7 +515,7 @@ export const PRODUCTS: Product[] = [
   { id: 'cl18', name: 'Πανάκια καθαρισμού',   category: 'cleaning', emoji: '🧹' },
   { id: 'cl19', name: 'Χαρτί κουζίνας',       category: 'cleaning', emoji: '🧻' },
 
-  // ── Home ──────────────────────────────────────────────────────────────────
+  // Home
   { id: 'ho01', name: 'Αλουμινόχαρτο',        category: 'home', emoji: '✨' },
   { id: 'ho02', name: 'Μεμβράνη τροφίμων',    category: 'home', emoji: '✨' },
   { id: 'ho03', name: 'Χαρτί ψησίματος',      category: 'home', emoji: '✨' },
