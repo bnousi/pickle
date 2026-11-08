@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'your shared grocery list',
     start_url: '/',
     display: 'standalone',
-    background_color: '#F8F7F2',
-    theme_color: '#F8F7F2',
+    background_color: '#EEF1EA',
+    theme_color: '#EEF1EA',
     icons: [
       { src: '/apple-touch-icon.png', sizes: '1024x1024', type: 'image/png' },
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },

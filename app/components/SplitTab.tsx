@@ -1,11 +1,13 @@
 'use client';
 
-import { Fragment, useState, type ChangeEvent, type RefObject } from 'react';
+import { useState, type ChangeEvent, type RefObject } from 'react';
 import type { Expense, HistoryGroup, Item } from '../lib/types';
 import type { Theme } from '../lib/theme';
 import { MONTHS_EN } from '../lib/content';
-import { fmtDate, getExpCatDisplay } from '../lib/format';
+import { fmtDate, getExpCatDisplay, monthTotals } from '../lib/format';
+import { ACCENT, HAIRLINE, INK, PARTNER_TINT, USER_TINT, avatarTint, btnPrimary, btnSecondary, glass, numeral } from '../lib/ui';
 import Empty from './Empty';
+import Icon from './Icon';
 
 type Props = {
   C: Theme;
@@ -39,193 +41,154 @@ export default function SplitTab({
 }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // Month-over-month numbers include already settled purchases
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
-  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const allExp = [...expenses, ...history.flatMap(g => g.expenses)];
-  const thisMonthTotal = allExp.filter(e => e.createdAt >= monthStart).reduce((s, e) => s + e.amount, 0);
-  const lastMonthTotal = allExp.filter(e => e.createdAt >= lastMonthStart && e.createdAt < monthStart).reduce((s, e) => s + e.amount, 0);
-  const monthDiffPct = lastMonthTotal > 0 ? Math.round((thisMonthTotal - lastMonthTotal) / lastMonthTotal * 100) : null;
+  const { thisMonth: thisMonthTotal, lastMonth: lastMonthTotal, diffPct: monthDiffPct, lastMonthIndex } = monthTotals(allExp, now);
   const budgetPct = budget ? Math.min(thisMonthTotal / budget, 1) : 0;
-  const budgetColor = budgetPct >= 0.9 ? '#FF5050' : budgetPct >= 0.7 ? '#F59E0B' : '#4ADE80';
+  const budgetColor = budgetPct >= 0.9 ? C.danger : budgetPct >= 0.7 ? '#C98A12' : ACCENT;
+  const openTotal = totalByUser + totalByPartner;
+  const userShare = openTotal > 0 ? (totalByUser / openTotal) * 100 : 50;
+  const partner = partnerName || '...';
 
   return (
-    <div style={{ paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
       {/* Spending card */}
-      <div role="button" tabIndex={0} onClick={() => onOpenSpending()} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSpending(); } }} style={{ width: '100%', textAlign: 'left', backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: '20px', padding: '20px 22px', cursor: 'pointer', fontFamily: 'inherit' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <p style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase', color: C.text, margin: 0 }}>Spending</p>
-          <button onClick={e => { e.stopPropagation(); onEditBudget(); }} style={{ fontSize: '11px', color: C.text, backgroundColor: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700' }}>
+      <div
+        role="button" tabIndex={0} aria-label="Open spending details" onClick={() => onOpenSpending()}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSpending(); } }}
+        className="slide-up"
+        style={{ ...glass(28), padding: '18px 20px 20px', cursor: 'pointer' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: C.dim, margin: 0 }}>Spent in {MONTHS_EN[now.getMonth()]}</p>
+          <button type="button" onClick={e => { e.stopPropagation(); onEditBudget(); }} style={{ height: '30px', padding: '0 12px', borderRadius: '999px', backgroundColor: 'rgba(16,35,26,0.07)', fontSize: '12px', fontWeight: 700, color: INK, cursor: 'pointer', fontFamily: 'inherit' }}>
             {budget ? 'Edit limit' : '+ Set limit'}
           </button>
         </div>
 
-        <p style={{ fontSize: '12px', color: C.text, fontWeight: '600', margin: '0 0 2px', letterSpacing: '0.3px' }}>{MONTHS_EN[now.getMonth()]} {now.getFullYear()}</p>
-        <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '40px', fontWeight: '700', color: C.text, margin: 0, lineHeight: 1 }}>
-          €{thisMonthTotal.toFixed(2)}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+          <span style={{ ...numeral, fontSize: '46px', color: C.text }}>€{thisMonthTotal.toFixed(2)}</span>
+          {budget && <span style={{ fontSize: '14px', fontWeight: 600, color: C.dim }}>of €{budget.toFixed(0)}</span>}
+        </div>
 
         {monthDiffPct !== null && thisMonthTotal === 0 && (
-          <p style={{ fontSize: '12px', color: C.dim, fontWeight: '600', margin: '10px 0 0' }}>
-            Nothing logged yet · {MONTHS_EN[lastMonthDate.getMonth()]}: €{lastMonthTotal.toFixed(0)}
+          <p style={{ fontSize: '13px', color: C.dim, fontWeight: 500, margin: '8px 0 0' }}>
+            Nothing logged yet · {MONTHS_EN[lastMonthIndex]}: €{lastMonthTotal.toFixed(0)}
           </p>
         )}
         {monthDiffPct !== null && thisMonthTotal > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' }}>
-            <span style={{ fontSize: '13px', fontWeight: '800', color: monthDiffPct <= 0 ? C.success : C.danger }}>
-              {monthDiffPct <= 0 ? '↓' : '↑'} {Math.abs(monthDiffPct)}%
-            </span>
-            <span style={{ fontSize: '12px', color: C.text, fontWeight: '600' }}>vs {MONTHS_EN[lastMonthDate.getMonth()]} · €{lastMonthTotal.toFixed(0)}</span>
-          </div>
+          <p style={{ fontSize: '13px', fontWeight: 600, margin: '8px 0 0', color: C.dim }}>
+            <span style={{ fontWeight: 700, color: monthDiffPct <= 0 ? ACCENT : C.danger }}>{monthDiffPct <= 0 ? '↓' : '↑'} {Math.abs(monthDiffPct)}%</span>
+            {' '}vs {MONTHS_EN[lastMonthIndex]} · €{lastMonthTotal.toFixed(0)}
+          </p>
         )}
 
         {budget && (
           <div style={{ marginTop: '16px' }}>
-            <div style={{ height: '10px', backgroundColor: C.surface2, borderRadius: '5px', overflow: 'hidden', marginBottom: '8px' }}>
-              <div style={{ height: '100%', width: `${Math.min(budgetPct * 100, 100)}%`, backgroundColor: budgetColor, borderRadius: '5px', transition: 'width 0.4s ease' }} />
+            <div style={{ height: '8px', backgroundColor: 'rgba(16,35,26,0.08)', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(budgetPct * 100, 100)}%`, backgroundColor: budgetColor, borderRadius: '999px', transition: 'width 0.5s ease' }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '12px', color: budgetPct >= 1 ? C.danger : C.dim, fontWeight: budgetPct >= 1 ? '700' : '400' }}>
-                {budgetPct >= 1 ? `Over by €${(thisMonthTotal - budget).toFixed(2)}` : `€${(budget - thisMonthTotal).toFixed(2)} left`}
-              </span>
-              <span style={{ fontSize: '12px', color: C.text, fontWeight: '600' }}>limit €{budget.toFixed(0)}</span>
-            </div>
+            <p style={{ fontSize: '12px', margin: '8px 0 0', color: budgetPct >= 1 ? C.danger : C.dim, fontWeight: budgetPct >= 1 ? 700 : 500 }}>
+              {budgetPct >= 1 ? `Over by €${(thisMonthTotal - budget).toFixed(2)}` : `€${(budget - thisMonthTotal).toFixed(2)} left this month`}
+            </p>
           </div>
         )}
+        <p style={{ fontSize: '12px', fontWeight: 700, color: ACCENT, margin: '14px 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          Calendar, categories and trends <Icon name="chevron-right" size={14} strokeWidth={2.4} />
+        </p>
       </div>
 
       {/* Balance card */}
-      <div style={{ borderRadius: '20px', overflow: 'hidden', border: `1px solid ${C.border}` }}>
-        <div style={{ background: 'linear-gradient(135deg, #1B5FAD, #1A4F99)', padding: '28px 24px 20px' }}>
+      <div className="slide-up" style={{ ...glass(28), padding: '18px 20px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
           {Math.abs(balance) < 0.01 ? (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '22px', color: '#FFFFFF', margin: '0 0 6px', fontWeight: '700' }}>All settled up</p>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.75)' }}>Nobody owes anything</p>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: C.dim, margin: 0 }}>Balance</p>
+              <p style={{ ...numeral, fontSize: '34px', color: C.text, margin: '4px 0 2px' }}>All settled up</p>
+              <p style={{ fontSize: '13px', color: C.dim, fontWeight: 500 }}>Nobody owes anything</p>
             </div>
           ) : (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 12px', fontWeight: '700' }}>
-                {balance > 0 ? `${partnerName || '...'} owes you` : `You owe ${partnerName || '...'}`}
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: C.dim, margin: 0 }}>
+                {balance > 0 ? `${partner} owes you` : `You owe ${partner}`}
               </p>
-              <div style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '52px', fontWeight: '700', color: balance > 0 ? '#7FFFA8' : '#FFB3AE', lineHeight: 1 }}>
+              <p style={{ ...numeral, fontSize: '46px', margin: '2px 0 0', color: balance > 0 ? ACCENT : C.danger }}>
                 €{Math.abs(balance).toFixed(2)}
-              </div>
+              </p>
             </div>
+          )}
+          {expenses.length > 0 && (
+              <button type="button" onClick={onSettle} style={{ ...btnPrimary, width: 'auto', minHeight: '44px', padding: '0 18px', fontSize: '14px', flexShrink: 0, backgroundColor: settleConfirm ? C.danger : INK }}>
+                {settleConfirm ? 'Sure?' : 'Settle up'}
+              </button>
           )}
         </div>
 
-        {/* Breakdown bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', backgroundColor: C.surface }}>
-          {[
-            { label: userName, amount: totalByUser },
-            { label: partnerName || '...', amount: totalByPartner },
-          ].map((person, i) => (
-            <Fragment key={i}>
-              {i === 1 && <div key="div" style={{ backgroundColor: C.border }} />}
-              <div key={person.label} style={{ padding: '16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: C.text, letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '4px', fontWeight: '900' }}>{person.label}</div>
-                <div style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '20px', color: C.accent, fontWeight: '700' }}>€{person.amount.toFixed(2)}</div>
-              </div>
-            </Fragment>
-          ))}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <button onClick={() => onNewExpense()} style={{ flex: 1, padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900', letterSpacing: '0.5px' }}>
-          + New
-        </button>
-        <button
-          onClick={() => receiptInputRef.current?.click()}
-          disabled={receiptLoading}
-          style={{ flex: 1, padding: '14px', backgroundColor: C.surface2, color: receiptLoading ? C.dim : C.text, border: `1px solid ${C.border}`, borderRadius: '12px', fontSize: '14px', cursor: receiptLoading ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: '700' }}
-        >
-          {receiptLoading ? '⏳ Reading…' : '📷 Scan'}
-        </button>
-        <input ref={receiptInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onReceiptImage} />
-        {expenses.length > 0 && (
-          <button onClick={onSettle} style={{ flex: 1, padding: '14px', backgroundColor: settleConfirm ? C.danger : C.surface2, color: settleConfirm ? '#fff' : C.text, border: `1px solid ${settleConfirm ? C.danger : C.border}`, borderRadius: '12px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700', transition: 'all 0.2s' }}>
-            {settleConfirm ? 'Sure?' : 'Settle up'}
-          </button>
+        {openTotal > 0 && (
+          <>
+            <div style={{ marginTop: '16px', height: '10px', display: 'flex', gap: '3px' }}>
+              <div style={{ width: `${userShare}%`, backgroundColor: '#5AA9E6', borderRadius: '999px', transition: 'width 0.5s ease' }} />
+              <div style={{ flex: 1, backgroundColor: '#E9B23C', borderRadius: '999px' }} />
+            </div>
+            <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: C.text }}>
+              <span>{userName} paid €{totalByUser.toFixed(2)}</span>
+              <span>{partner} paid €{totalByPartner.toFixed(2)}</span>
+            </div>
+          </>
         )}
       </div>
 
-      {/* Expenses — receipt style */}
+      {/* Actions */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
+        <button type="button" onClick={() => onNewExpense()} style={btnPrimary}>
+          <Icon name="plus" size={18} strokeWidth={2.4} /> Purchase
+        </button>
+        <button type="button" onClick={() => receiptInputRef.current?.click()} disabled={receiptLoading} style={{ ...btnSecondary, opacity: receiptLoading ? 0.6 : 1, cursor: receiptLoading ? 'progress' : 'pointer' }}>
+          <Icon name="camera" size={18} /> {receiptLoading ? 'Reading…' : 'Scan receipt'}
+        </button>
+        <input ref={receiptInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onReceiptImage} />
+      </div>
+
+      {/* Open purchases */}
       {expenses.length === 0 ? (
-        <Empty C={C} title="No expenses yet" sub={'Add a purchase to start\ntracking who paid what'} />
+        <Empty C={C} title="No purchases yet" sub={'Add a purchase or scan a receipt\nto start tracking who paid what'} />
       ) : (
-        <div style={{ backgroundColor: '#FEFEF8', border: `1px solid ${C.border}`, borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
-          {/* Receipt header */}
-          <div style={{ textAlign: 'center', padding: '18px 16px 14px', borderBottom: '1.5px dashed #C4C0B8' }}>
-            <div style={{ fontSize: '13px', fontWeight: '900', letterSpacing: '5px', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace", marginBottom: '2px' }}>PICKLE</div>
-            <div style={{ fontSize: '9px', color: '#6B6863', letterSpacing: '3px', fontFamily: "var(--font-mono), 'Courier New', monospace", marginBottom: '4px' }}>PURCHASE LOG</div>
-            <div style={{ fontSize: '9px', color: '#C4C0B8', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 6px 8px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 700, color: C.text, margin: 0 }}>Open purchases</p>
+            <p style={{ fontSize: '13px', fontWeight: 600, color: C.dim, margin: 0 }}>{expenses.length}</p>
           </div>
-
-          {/* Expense rows */}
-          {expenses.map((exp, i) => {
-            const name = resolvePaidBy(exp.paidBy) || exp.paidBy;
-            const expDateKey = new Date(exp.createdAt).toDateString();
-            const tripItems = bought.filter(it => new Date(it.updatedAt ?? it.createdAt).toDateString() === expDateKey);
-            return (
-              <button key={exp.id} onClick={() => onEditExpense(exp)} style={{ display: 'block', width: '100%', textAlign: 'left', backgroundColor: 'transparent', border: 'none', padding: '12px 18px', borderBottom: i < expenses.length - 1 ? '1px dashed #C4C0B8' : 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#1A1A18', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: "var(--font-mono), 'Courier New', monospace", flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {exp.category ? getExpCatDisplay(exp.category).emoji + ' ' : ''}{name}
+          <div style={{ ...glass(24), padding: '0 16px' }}>
+            {expenses.map((exp, i) => {
+              const name = resolvePaidBy(exp.paidBy) || exp.paidBy;
+              const expDateKey = new Date(exp.createdAt).toDateString();
+              const tripItems = bought.filter(it => new Date(it.updatedAt ?? it.createdAt).toDateString() === expDateKey);
+              const cat = getExpCatDisplay(exp.category);
+              return (
+                <button key={exp.id} type="button" onClick={() => onEditExpense(exp)} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', textAlign: 'left', padding: '12px 0', borderTop: i > 0 ? `1px solid ${HAIRLINE}` : 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <span style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: avatarTint(name, userName), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: INK, flexShrink: 0 }}>
+                    {name[0]?.toUpperCase()}
                   </span>
-                  <span style={{ fontSize: '15px', fontWeight: '900', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace", flexShrink: 0 }}>
-                    €{exp.amount.toFixed(2)}
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '15px', fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.note || cat.label}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 500, color: C.dim }}>
+                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: cat.accent, flexShrink: 0 }} />
+                      {cat.label} · {fmtDate(exp.createdAt)}
+                    </span>
+                    {tripItems.length > 0 && (
+                      <span style={{ fontSize: '12px', color: C.muted, marginTop: '2px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {tripItems.slice(0, 6).map(it => it.name).join(', ')}{tripItems.length > 6 ? ` +${tripItems.length - 6}` : ''}
+                      </span>
+                    )}
                   </span>
-                </div>
-                {exp.note && <div style={{ fontSize: '10px', color: '#3A3A36', fontWeight: '700', marginTop: '2px', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>{exp.note}</div>}
-                {tripItems.length > 0 && (
-                  <div style={{ fontSize: '9px', color: '#4A4A44', marginTop: '3px', fontFamily: "var(--font-mono), 'Courier New', monospace", lineHeight: 1.5 }}>
-                    {tripItems.slice(0, 6).map(it => it.name).join(', ')}{tripItems.length > 6 ? ` +${tripItems.length - 6}` : ''}
-                  </div>
-                )}
-                <div style={{ fontSize: '9px', color: '#6B6863', fontWeight: '600', marginTop: '2px', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>{fmtDate(exp.createdAt)}</div>
-              </button>
-            );
-          })}
-
-          {/* Total + breakdown + balance */}
-          <div style={{ padding: '14px 18px 18px', borderTop: '2px dashed #C4C0B8', backgroundColor: '#F8F7F2' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '12px' }}>
-              <span style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '3px', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>TOTAL</span>
-              <span style={{ fontSize: '22px', fontWeight: '900', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace" }}>€{expenses.reduce((s, e) => s + e.amount, 0).toFixed(2)}</span>
-            </div>
-
-            <div style={{ borderTop: '1px dashed #C4C0B8', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
-              {[
-                { label: userName.toUpperCase(), amount: totalByUser },
-                { label: (partnerName || '...').toUpperCase(), amount: totalByPartner },
-              ].map(p => (
-                <div key={p.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', color: '#1A1A18', fontWeight: '700', fontFamily: "var(--font-mono), 'Courier New', monospace", letterSpacing: '1px' }}>{p.label}</span>
-                  <span style={{ fontSize: '11px', color: '#1A1A18', fontFamily: "var(--font-mono), 'Courier New', monospace", fontWeight: '700' }}>€{p.amount.toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-
-            {Math.abs(balance) > 0.01 && (
-              <div style={{ borderTop: '2px dashed #C4C0B8', paddingTop: '10px', textAlign: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: '900', letterSpacing: '1px', fontFamily: "var(--font-mono), 'Courier New', monospace", color: balance > 0 ? '#2D7D46' : '#D93025' }}>
-                  {balance > 0
-                    ? `${(partnerName || '...').toUpperCase()} OWES YOU €${Math.abs(balance).toFixed(2)}`
-                    : `YOU OWE ${(partnerName || '...').toUpperCase()} €${Math.abs(balance).toFixed(2)}`}
-                </span>
-              </div>
-            )}
-
-            {/* Decorative barcode */}
-            <div style={{ marginTop: '18px', display: 'flex', justifyContent: 'center', gap: '2px', opacity: 0.15 }}>
-              {Array.from({ length: 32 }, (_, i) => (
-                <div key={i} style={{ width: i % 4 === 0 ? '3px' : '1px', height: '22px', backgroundColor: '#1A1A18', borderRadius: '1px' }} />
-              ))}
+                  <span style={{ fontSize: '16px', fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>€{exp.amount.toFixed(2)}</span>
+                </button>
+              );
+            })}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '14px 0 16px', borderTop: `1px solid ${HAIRLINE}` }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>Total</span>
+              <span style={{ ...numeral, fontSize: '24px', color: C.text }}>€{openTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -233,47 +196,39 @@ export default function SplitTab({
 
       {/* History */}
       {history.length > 0 && (
-        <div style={{ marginTop: '24px' }}>
+        <div style={{ marginTop: '6px' }}>
           <button
-            onClick={() => setHistoryOpen(v => !v)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: C.surface, borderRadius: '12px', border: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit' }}
+            type="button" onClick={() => setHistoryOpen(v => !v)} aria-expanded={historyOpen}
+            style={{ ...glass(18), width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer', fontFamily: 'inherit' }}
           >
-            <span style={{ fontSize: '12px', fontWeight: '900', color: C.text, letterSpacing: '1px', textTransform: 'uppercase' }}>
-              History ({history.length} {history.length === 1 ? 'settlement' : 'settlements'})
+            <span style={{ fontSize: '14px', fontWeight: 700, color: C.text }}>
+              History · {history.length} {history.length === 1 ? 'settlement' : 'settlements'}
             </span>
-            <span style={{ fontSize: '16px', color: C.muted, transform: historyOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>˅</span>
+            <Icon name="chevron-down" size={18} style={{ transform: historyOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
           </button>
           {historyOpen && (
-            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {history.map(group => (
-                <div key={group.settledAt} style={{ backgroundColor: C.surface, borderRadius: '14px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '700', color: C.text, letterSpacing: '0.5px' }}>
-                      {fmtDate(group.settledAt)}
-                    </span>
-                    <span style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '15px', fontWeight: '700', color: C.text }}>
-                      €{group.total.toFixed(2)}
-                    </span>
+                <div key={group.settledAt} className="slide-up" style={{ ...glass(20), padding: '0 16px' }}>
+                  <div style={{ padding: '12px 0', borderBottom: `1px solid ${HAIRLINE}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>Settled {fmtDate(group.settledAt)}</span>
+                    <span style={{ fontSize: '15px', fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>€{group.total.toFixed(2)}</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {group.expenses.map((exp, i) => {
-                      const name = resolvePaidBy(exp.paidBy) || exp.paidBy;
-                      return (
-                        <div key={exp.id} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: i < group.expenses.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '900', color: C.dim, flexShrink: 0 }}>
-                            {name[0]?.toUpperCase()}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ fontSize: '13px', color: C.text, fontWeight: '800' }}>{name}</span>
-                            {exp.note && <span style={{ fontSize: '12px', color: C.dim, marginLeft: '8px' }}>{exp.note}</span>}
-                          </div>
-                          <span style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '14px', color: C.text, fontWeight: '700' }}>
-                            €{exp.amount.toFixed(2)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {group.expenses.map((exp, i) => {
+                    const name = resolvePaidBy(exp.paidBy) || exp.paidBy;
+                    return (
+                      <div key={exp.id} style={{ padding: '10px 0', display: 'flex', alignItems: 'center', gap: '12px', borderTop: i > 0 ? `1px solid ${HAIRLINE}` : 'none' }}>
+                        <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: name === userName ? USER_TINT : PARTNER_TINT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: INK, flexShrink: 0 }}>
+                          {name[0]?.toUpperCase()}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: '14px', fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {exp.note || name}
+                          <span style={{ fontWeight: 500, color: C.dim }}> · {fmtDate(exp.createdAt)}</span>
+                        </span>
+                        <span style={{ fontSize: '14px', color: C.text, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>€{exp.amount.toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>

@@ -5,6 +5,12 @@ import type { Expense } from '../lib/types';
 import type { Theme } from '../lib/theme';
 import { MONTHS_EN } from '../lib/content';
 import { getExpCatDisplay } from '../lib/format';
+import { ACCENT, glass, iconBtn, numeral } from '../lib/ui';
+import Icon from './Icon';
+
+const USER_COLOR = '#2F7FC1';
+const PARTNER_COLOR = '#B7790F';
+const BOTH_COLOR = '#7A63D1';
 
 export default function SpendingDetail({ allExp, C, now, budget, userName, partnerName, initialMonth }: { allExp: Expense[]; C: Theme; now: Date; budget: number | null; userName: string; partnerName: string; initialMonth?: { year: number; month: number } }) {
   const [dm, setDm] = useState(initialMonth ?? { year: now.getFullYear(), month: now.getMonth() });
@@ -46,55 +52,30 @@ export default function SpendingDetail({ allExp, C, now, budget, userName, partn
   const WEEK = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 
   const budgetPct = budget && monthTotal ? Math.min(monthTotal / budget, 1) : 0;
+  const card = { ...glass(24), padding: '16px' };
+  const heading: React.CSSProperties = { fontSize: '13px', fontWeight: 700, color: C.text, margin: '0 0 12px' };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
       {/* Month navigator */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button onClick={prevMonth} style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${C.border}`, backgroundColor: C.surface2, color: C.text, fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
+        <button type="button" onClick={prevMonth} aria-label="Previous month" style={iconBtn}><Icon name="chevron-left" size={18} /></button>
         <div style={{ flex: 1, textAlign: 'center' }}>
-          <p style={{ fontSize: '12px', color: C.dim, margin: '0 0 2px', letterSpacing: '0.3px' }}>{MONTHS_EN[dm.month]} {dm.year}</p>
-          <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '32px', fontWeight: '700', color: C.text, margin: 0, lineHeight: 1 }}>€{monthTotal.toFixed(2)}</p>
+          <p style={{ fontSize: '13px', color: C.dim, margin: 0, fontWeight: 600 }}>{MONTHS_EN[dm.month]} {dm.year}</p>
+          <p style={{ ...numeral, fontSize: '44px', color: C.text, margin: '2px 0 0' }}>€{monthTotal.toFixed(2)}</p>
           {monthTotal > 0 && (
-            <p style={{ fontSize: '12px', color: C.dim, margin: '6px 0 0' }}>
+            <p style={{ fontSize: '12px', color: C.dim, margin: '6px 0 0', fontWeight: 500 }}>
               {userName} €{monthByUser.toFixed(2)} · {partnerName || '...'} €{monthByPartner.toFixed(2)}
             </p>
           )}
           {budget && (
-            <p style={{ fontSize: '12px', color: budgetPct >= 1 ? '#FF5050' : C.dim, margin: '4px 0 0', fontWeight: budgetPct >= 1 ? '700' : '400' }}>
-              {budgetPct >= 1 ? `over limit by €${(monthTotal - budget).toFixed(2)}` : `€${(budget - monthTotal).toFixed(2)} under limit`}
+            <p style={{ fontSize: '12px', color: budgetPct >= 1 ? C.danger : C.dim, margin: '4px 0 0', fontWeight: budgetPct >= 1 ? 700 : 500 }}>
+              {budgetPct >= 1 ? `Over the limit by €${(monthTotal - budget).toFixed(2)}` : `€${(budget - monthTotal).toFixed(2)} under the limit`}
             </p>
           )}
         </div>
-        <button onClick={nextMonth} disabled={!canNext} style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${C.border}`, backgroundColor: C.surface2, color: canNext ? C.text : C.muted, fontSize: '18px', cursor: canNext ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>›</button>
-      </div>
-
-      {/* Calendar */}
-      <div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', marginBottom: '6px' }}>
-          {WEEK.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '700', color: C.dim }}>{d}</div>)}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px' }}>
-          {Array.from({ length: firstDow }, (_, i) => <div key={`e${i}`} />)}
-          {Array.from({ length: daysInMonth }, (_, i) => {
-            const day = i + 1;
-            const amt = byDay[day];
-            const hasUser = !!byDayUser[day];
-            const hasPartner = !!byDayPartner[day];
-            const both = hasUser && hasPartner;
-            const isToday = dm.year === now.getFullYear() && dm.month === now.getMonth() && day === now.getDate();
-            const dotColor = both ? '#9B59D0' : hasUser ? '#1B5FAD' : hasPartner ? '#2D7D46' : null;
-            const bgColor = both ? 'rgba(155,89,208,0.13)' : hasUser ? 'rgba(27,95,173,0.13)' : hasPartner ? 'rgba(45,125,70,0.13)' : isToday ? C.surface2 : 'transparent';
-            const borderColor = both ? '#9B59D055' : hasUser ? '#1B5FAD55' : hasPartner ? '#2D7D4655' : isToday ? C.border : 'transparent';
-            return (
-              <div key={day} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '46px', borderRadius: '10px', backgroundColor: bgColor, border: `1.5px solid ${borderColor}`, padding: '4px 2px', gap: '2px' }}>
-                <span style={{ fontSize: '12px', color: dotColor ?? (isToday ? C.text : C.dim), fontWeight: amt || isToday ? '700' : '400', lineHeight: 1 }}>{day}</span>
-                {amt && <span style={{ fontSize: '9px', color: dotColor ?? C.dim, fontWeight: '800', lineHeight: 1 }}>€{amt % 1 === 0 ? Math.round(amt) : amt.toFixed(2)}</span>}
-              </div>
-            );
-          })}
-        </div>
+        <button type="button" onClick={nextMonth} disabled={!canNext} aria-label="Next month" style={{ ...iconBtn, opacity: canNext ? 1 : 0.35, cursor: canNext ? 'pointer' : 'default' }}><Icon name="chevron-right" size={18} /></button>
       </div>
 
       {/* Donut chart — category breakdown */}
@@ -104,43 +85,45 @@ export default function SpendingDetail({ allExp, C, now, budget, userName, partn
           const cat = e.category || 'other';
           bycat[cat] = (bycat[cat] || 0) + e.amount;
         }
-        const R = 50, cx = 65, cy = 65, strokeW = 20;
+        const R = 54, cx = 70, cy = 70, strokeW = 16;
         const circ = 2 * Math.PI * R;
+        const entries = Object.entries(bycat).sort((a, b) => b[1] - a[1]);
+        const gap = entries.length > 1 ? 4 : 0;
         let offsetFrac = 0;
-        const slices = Object.entries(bycat)
-          .sort((a, b) => b[1] - a[1])
-          .map(([cat, amt]) => {
-            const pct = amt / monthTotal;
-            const dashLen = pct * circ;
-            const dashOffset = -(offsetFrac * circ);
-            offsetFrac += pct;
-            return { cat, amt, pct, dashLen, dashOffset };
-          });
+        const slices = entries.map(([cat, amt]) => {
+          const pct = amt / monthTotal;
+          const dashLen = Math.max(pct * circ - gap, 0.5);
+          const dashOffset = -(offsetFrac * circ);
+          offsetFrac += pct;
+          return { cat, amt, pct, dashLen, dashOffset };
+        });
 
         return (
-          <div>
-            <p style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: C.dim, margin: '0 0 14px' }}>By category</p>
+          <div style={card}>
+            <p style={heading}>By category</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <svg width="130" height="130" viewBox="0 0 130 130" style={{ flexShrink: 0 }}>
+              <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-label={`Spending by category, €${monthTotal.toFixed(0)}`} style={{ flexShrink: 0 }}>
+                <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(16,35,26,0.07)" strokeWidth={strokeW} />
                 {slices.map(s => (
                   <circle key={s.cat} cx={cx} cy={cy} r={R}
                     fill="none" stroke={getExpCatDisplay(s.cat).accent}
-                    strokeWidth={strokeW}
+                    strokeWidth={strokeW} strokeLinecap={gap ? 'round' : 'butt'}
                     strokeDasharray={`${s.dashLen} ${circ - s.dashLen}`}
                     strokeDashoffset={s.dashOffset}
-                    style={{ transform: 'rotate(-90deg)', transformOrigin: `${cx}px ${cy}px` }}
+                    style={{ transform: 'rotate(-90deg)', transformOrigin: `${cx}px ${cy}px`, transition: 'stroke-dasharray 0.5s ease' }}
                   />
                 ))}
+                <text x={cx} y={cy + 2} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: '20px', fontWeight: 300, fill: C.text, fontFamily: 'inherit' }}>€{Math.round(monthTotal)}</text>
               </svg>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', flex: 1 }}>
-                {slices.map(s => {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', flex: 1, minWidth: 0 }}>
+                {slices.slice(0, 7).map(s => {
                   const d = getExpCatDisplay(s.cat);
                   return (
-                    <div key={s.cat} style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <div style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: d.accent, flexShrink: 0 }} />
-                      <span style={{ fontSize: '12px', color: C.text, fontWeight: '700', flex: 1 }}>{d.emoji} {d.label}</span>
-                      <span style={{ fontSize: '11px', color: C.dim, fontFamily: "var(--font-mono), 'Courier New', monospace" }}>€{s.amt.toFixed(0)}</span>
-                      <span style={{ fontSize: '12px', color: C.dim, fontWeight: '600' }}>{Math.round(s.pct * 100)}%</span>
+                    <div key={s.cat} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: d.accent, flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', color: C.text, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
+                      <span style={{ fontSize: '13px', color: C.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>€{s.amt.toFixed(0)}</span>
+                      <span style={{ fontSize: '12px', color: C.dim, fontWeight: 600, minWidth: '32px', textAlign: 'right' }}>{Math.round(s.pct * 100)}%</span>
                     </div>
                   );
                 })}
@@ -150,27 +133,58 @@ export default function SpendingDetail({ allExp, C, now, budget, userName, partn
         );
       })()}
 
-      {/* Monthly bar chart */}
-      <div>
-        <p style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: C.dim, margin: '0 0 16px' }}>Last 6 months</p>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end' }}>
-          {chartMonths.map(m => {
-            const isSel = m.year === dm.year && m.month === dm.month;
-            const barH = m.total > 0 ? Math.max(Math.round((m.total / maxBar) * 88), 6) : 0;
+      {/* Calendar */}
+      <div style={card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 12px' }}>
+          <p style={{ ...heading, margin: 0 }}>Calendar</p>
+          <div style={{ display: 'flex', gap: '10px', fontSize: '11px', fontWeight: 600, color: C.dim }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: USER_COLOR }} />{userName}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: PARTNER_COLOR }} />{partnerName || '...'}</span>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '4px', marginBottom: '6px' }}>
+          {WEEK.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '11px', fontWeight: 600, color: C.dim }}>{d}</div>)}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '4px' }}>
+          {Array.from({ length: firstDow }, (_, i) => <div key={`e${i}`} />)}
+          {Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1;
+            const amt = byDay[day];
+            const hasUser = !!byDayUser[day];
+            const hasPartner = !!byDayPartner[day];
+            const both = hasUser && hasPartner;
+            const isToday = dm.year === now.getFullYear() && dm.month === now.getMonth() && day === now.getDate();
+            const dotColor = both ? BOTH_COLOR : hasUser ? USER_COLOR : hasPartner ? PARTNER_COLOR : null;
             return (
-              <div key={`${m.year}-${m.month}`} onClick={() => setDm({ year: m.year, month: m.month })} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                <span style={{ fontSize: '9px', color: isSel ? C.accent : C.dim, fontWeight: '700', height: '14px', display: 'flex', alignItems: 'flex-end' }}>
-                  {m.total > 0 ? `€${Math.round(m.total)}` : ''}
-                </span>
-                <div style={{ width: '100%', height: '88px', display: 'flex', alignItems: 'flex-end' }}>
-                  <div style={{ width: '100%', height: `${barH}px`, backgroundColor: isSel ? C.accent : C.surface2, borderRadius: '4px 4px 0 0', transition: 'all 0.25s ease' }} />
-                </div>
-                <span style={{ fontSize: '9px', color: isSel ? C.accent : C.dim, fontWeight: isSel ? '700' : '400' }}>{MONTHS_SHORT[m.month]}</span>
+              <div key={day} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '44px', borderRadius: '12px', backgroundColor: dotColor ? `${dotColor}1F` : isToday ? 'rgba(255,255,255,0.8)' : 'transparent', boxShadow: isToday ? `inset 0 0 0 1.5px ${ACCENT}` : 'none', padding: '4px 1px', gap: '2px' }}>
+                <span style={{ fontSize: '12px', color: dotColor ?? (isToday ? C.text : C.dim), fontWeight: amt || isToday ? 700 : 500, lineHeight: 1 }}>{day}</span>
+                {amt && <span style={{ fontSize: '9px', color: dotColor ?? C.dim, fontWeight: 700, lineHeight: 1 }}>€{amt % 1 === 0 ? Math.round(amt) : amt.toFixed(0)}</span>}
               </div>
             );
           })}
         </div>
-        <div style={{ height: '1px', backgroundColor: C.border }} />
+      </div>
+
+      {/* Monthly bar chart */}
+      <div style={card}>
+        <p style={heading}>Last 6 months</p>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+          {chartMonths.map(m => {
+            const isSel = m.year === dm.year && m.month === dm.month;
+            const barH = m.total > 0 ? Math.max(Math.round((m.total / maxBar) * 96), 6) : 0;
+            return (
+              <button type="button" key={`${m.year}-${m.month}`} onClick={() => setDm({ year: m.year, month: m.month })} aria-pressed={isSel} aria-label={`${MONTHS_EN[m.month]}: €${Math.round(m.total)}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                <span style={{ fontSize: '10px', color: isSel ? ACCENT : C.dim, fontWeight: 700, height: '14px', display: 'flex', alignItems: 'flex-end' }}>
+                  {m.total > 0 ? `€${Math.round(m.total)}` : ''}
+                </span>
+                <span style={{ width: '100%', height: '96px', display: 'flex', alignItems: 'flex-end' }}>
+                  <span style={{ width: '100%', height: `${barH}px`, backgroundColor: isSel ? ACCENT : 'rgba(30,107,67,0.22)', borderRadius: '10px', transition: 'all 0.25s ease' }} />
+                </span>
+                <span style={{ fontSize: '11px', color: isSel ? ACCENT : C.dim, fontWeight: isSel ? 700 : 500 }}>{MONTHS_SHORT[m.month]}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
     </div>

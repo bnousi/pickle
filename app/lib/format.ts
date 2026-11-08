@@ -10,6 +10,17 @@ export function fmtDate(ts: number) {
   return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+// This month vs last month, counting settled purchases too.
+export function monthTotals(allExp: { amount: number; createdAt: number }[], now: Date) {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthStart = lastMonthDate.getTime();
+  const thisMonth = allExp.filter(e => e.createdAt >= monthStart).reduce((s, e) => s + e.amount, 0);
+  const lastMonth = allExp.filter(e => e.createdAt >= lastMonthStart && e.createdAt < monthStart).reduce((s, e) => s + e.amount, 0);
+  const diffPct = lastMonth > 0 ? Math.round((thisMonth - lastMonth) / lastMonth * 100) : null;
+  return { thisMonth, lastMonth, diffPct, lastMonthIndex: lastMonthDate.getMonth() };
+}
+
 // Expenses saved before the category list was expanded use the old keys below.
 
 const LEGACY_CAT_DISPLAY: Record<string, { label: string; emoji: string; accent: string; bg: string }> = {

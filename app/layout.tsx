@@ -1,18 +1,12 @@
-import type { Metadata } from "next";
-import { Josefin_Sans, JetBrains_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
-const main = Josefin_Sans({
-  subsets: ["latin"],
-  weight: ["100", "300", "400", "600", "700"],
-  variable: "--font-lato",
-  display: "swap",
-});
-
-// Monospace with proper Greek glyphs (Courier New leaves gaps around ι)
-const mono = JetBrains_Mono({
+// Greek subset included: most list items are written in Greek
+const sans = Manrope({
   subsets: ["latin", "greek"],
-  variable: "--font-mono",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-sans",
   display: "swap",
 });
 
@@ -29,13 +23,17 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#EEF1EA",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${main.variable} ${mono.variable}`}>
+    <html lang="en" className={sans.variable}>
       <body>{children}</body>
     </html>
   );

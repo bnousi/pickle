@@ -1,13 +1,17 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { CAT, CAT_ORDER, PRODUCTS } from './lib/products';
 import type { Category, Product } from './lib/products';
 import type { Item, Expense, HistoryGroup, CustomProduct, Tab } from './lib/types';
-import { THEMES, SECTION_COLORS } from './lib/theme';
-import type { ThemeName } from './lib/theme';
+import { GLASS } from './lib/theme';
 import { MONTHS_EN, SUPERMARKETS, SHOP_DONE_MSGS } from './lib/content';
-import { genId, fmtDate, getExpCatDisplay, resolveExpCat } from './lib/format';
+import { genId, fmtDate, getExpCatDisplay, monthTotals, resolveExpCat } from './lib/format';
+import {
+  ACCENT, HAIRLINE, PARTNER_TINT, USER_TINT,
+  bigNumberInput, btnDanger, btnPrimary, btnSecondary, choiceStyle, glass, glassStrong,
+  iconBtn, inputStyle, labelStyle, numeral, pillStyle, sectionTitle,
+} from './lib/ui';
 import { buildDemo } from './lib/demo';
 import ItemCard from './components/ItemCard';
 import ProductGrid from './components/ProductGrid';
@@ -19,20 +23,11 @@ import SetupScreen from './components/SetupScreen';
 import HomeScreen from './components/HomeScreen';
 import DemoBanner from './components/DemoBanner';
 import SplitTab from './components/SplitTab';
+import GlassBackground from './components/GlassBackground';
+import TabBar from './components/TabBar';
+import Icon from './components/Icon';
 
-// Faded stickers fixed behind the main screens
-const BACKGROUND_STICKERS: { src: string; style: React.CSSProperties }[] = [
-  { src: '/stk-jello.png', style: { top: '22%', left: '-10px', width: '90px', opacity: 0.2, transform: 'rotate(-10deg)' } },
-  { src: '/stk-super-special.png', style: { top: '34%', right: '-8px', width: '90px', opacity: 0.2, transform: 'rotate(-16deg)' } },
-  { src: '/stk-pie.png', style: { top: '58%', right: '-12px', width: '108px', opacity: 0.2, transform: 'rotate(12deg)' } },
-  { src: '/stk-dragonfruit.png', style: { top: '72%', left: '-8px', width: '96px', opacity: 0.2, transform: 'rotate(-18deg)' } },
-  { src: '/stk-japanese-burst.png', style: { bottom: '4%', right: '-10px', width: '100px', opacity: 0.2, transform: 'rotate(10deg)' } },
-  { src: '/stk-big-sale.png', style: { bottom: '4%', left: '-8px', width: '90px', opacity: 0.2, transform: 'rotate(-14deg)' } },
-  { src: '/stk-grapes.png', style: { top: '42%', left: '58%', width: '82px', opacity: 0.2, transform: 'rotate(-12deg)' } },
-  { src: '/stk-tomatoes-vine.png', style: { top: '55%', left: '28%', width: '84px', opacity: 0.2, transform: 'rotate(16deg)' } },
-  { src: '/stk-pineapple.png', style: { top: '66%', left: '55%', height: '86px', width: 'auto', opacity: 0.2, transform: 'rotate(-8deg)' } },
-  { src: '/stk-soymilk.png', style: { top: '78%', left: '35%', width: '76px', opacity: 0.2, transform: 'rotate(12deg)' } },
-];
+const C = GLASS;
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -42,7 +37,6 @@ export default function App() {
   const [partnerName, setPartnerName] = useState('');
   const [tab, setTab] = useState<Tab>('shop');
   const [showHome, setShowHome] = useState(true);
-  const [themeName, setThemeName] = useState<ThemeName>('bold');
 
   const [items, setItems] = useState<Item[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -160,7 +154,6 @@ export default function App() {
     const it = localStorage.getItem('dnk-items');
     const ex = localStorage.getItem('dnk-expenses');
     const cp = localStorage.getItem('dnk-custom-products');
-    const th = localStorage.getItem('dnk-theme') as ThemeName | null;
     const code = localStorage.getItem('dnk-code');
     // Hydrate from localStorage after mount (not available during SSR)
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -168,7 +161,6 @@ export default function App() {
     if (it) setItems(JSON.parse(it));
     if (ex) setExpenses(JSON.parse(ex));
     if (cp) setCustomProducts(JSON.parse(cp));
-    if (th && th in THEMES) setThemeName(th);
     if (code) setHouseholdCode(code);
     if (localStorage.getItem('pickle-demo') === '1') {
       setIsDemo(true);
@@ -217,6 +209,7 @@ export default function App() {
   }, []);
 
   // Measure header height so sticky chips bar knows where to stop
+  // (re-run once the main screen is mounted: the header doesn't exist on Home/setup)
   useEffect(() => {
     const el = headerRef.current;
     if (!el) return;
@@ -224,7 +217,7 @@ export default function App() {
     const ro = new ResizeObserver(() => setHeaderHeight(el.offsetHeight));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [showHome, isSetup, ready]);
 
   // Scroll spy: highlight the category chip of the section currently in view
   useEffect(() => {
@@ -241,10 +234,6 @@ export default function App() {
     onScroll();
     return () => window.removeEventListener('scroll', onScroll);
   }, [tab, filterCat, search, headerHeight]);
-
-  useEffect(() => {
-    localStorage.setItem('dnk-theme', themeName);
-  }, [themeName]);
 
   useEffect(() => {
     if (ready && !isSetup) localStorage.setItem('dnk-items', JSON.stringify(items));
@@ -355,19 +344,6 @@ export default function App() {
     return all.filter(p => normalize(p.name).includes(q)).slice(0, 6);
   }, [formName, customProducts]);
 
-  const C = THEMES[themeName];
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '12px 14px',
-    border: `1.5px solid ${C.border}`, borderRadius: '10px',
-    fontSize: '15px', backgroundColor: C.surface2,
-    color: C.text, fontFamily: 'inherit',
-  };
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '12px', letterSpacing: '1.5px',
-    textTransform: 'uppercase', color: C.dim,
-    marginBottom: '6px', fontWeight: '700',
-  };
-
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
@@ -464,9 +440,11 @@ export default function App() {
     localStorage.setItem('dnk-items', JSON.stringify(d.items));
     localStorage.setItem('dnk-expenses', JSON.stringify(d.expenses));
     localStorage.setItem('dnk-budget', String(d.budget));
+    localStorage.setItem('dnk-recurring', JSON.stringify(d.recurring));
     setUserName(d.user); setPartnerName(d.partner);
     setItems(d.items); setExpenses(d.expenses); setHistory(d.history);
-    setBudget(d.budget);
+    setBudget(d.budget); setRecurring(d.recurring); setBuyCounts({});
+    setTab('shop'); setShowHome(true);
     setHouseholdCode('');
     setIsDemo(true);
     setIsSetup(false);
@@ -476,6 +454,7 @@ export default function App() {
     clearLocalData();
     localStorage.setItem('pickle-rename-seen', '1');
     setItems([]); setExpenses([]); setHistory([]); setBudget(null);
+    setRecurring({}); setBuyCounts({});
     setUserName(''); setPartnerName('');
     setIsDemo(false);
     setIsSetup(true);
@@ -871,265 +850,250 @@ export default function App() {
   const demoBanner = isDemo ? <DemoBanner onExit={exitDemo} /> : null;
 
   if (showHome) return (
-    <HomeScreen C={C} itemCount={toBuy.length} onOpen={() => goTo('shop')} banner={demoBanner} />
+    <HomeScreen
+      C={C} userName={userName} partnerName={partnerName}
+      toBuy={toBuy} boughtCount={bought.length}
+      monthTotal={monthTotals(allExp, now).thisMonth} budget={budget} balance={balance}
+      onOpen={goTo} banner={demoBanner}
+    />
   );
+
+  const avatarFor = (name: string) => name === userName ? USER_TINT : name === partnerName ? PARTNER_TINT : 'rgba(16,35,26,0.08)';
+  const partnerLabel = partnerName || '...';
+
+  const titles: Record<Tab, { title: string; sub: string }> = {
+    shop: {
+      title: 'List',
+      sub: toBuy.length === 0 ? 'Nothing to buy right now' : `${toBuy.length} to buy · ${bought.length} in the basket`,
+    },
+    find: { title: 'Find', sub: `${allProducts.length} products · tap to add, double-tap to edit` },
+    split: { title: 'Split', sub: `${MONTHS_EN[now.getMonth()]} · ${userName} & ${partnerLabel}` },
+  };
+
+  const tabAction = tab === 'shop'
+    ? { label: 'Add an item', icon: 'plus' as const, onClick: () => setFormOpen(true) }
+    : tab === 'find'
+      ? { label: 'Add a product to the catalog', icon: 'plus' as const, onClick: () => setAddCatalogOpen(true) }
+      : { label: receiptLoading ? 'Reading receipt…' : 'Scan a receipt', icon: 'camera' as const, onClick: () => receiptInputRef.current?.click(), busy: receiptLoading };
+
+  const textBtn: React.CSSProperties = { height: '32px', padding: '0 12px', borderRadius: '999px', backgroundColor: 'rgba(16,35,26,0.07)', fontSize: '12px', fontWeight: 700, color: C.text, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 };
+  const stepBtn: React.CSSProperties = { width: '36px', height: '36px', borderRadius: '50%', border: '1px solid rgba(16,35,26,0.12)', backgroundColor: 'rgba(255,255,255,0.75)', color: C.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
+  const catDot = (color: string, size = 8) => <span style={{ width: `${size}px`, height: `${size}px`, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }} />;
+
+  function whoPaid(value: string, onChange: (v: string) => void) {
+    return (
+      <div>
+        <span style={labelStyle}>Who paid?</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+          {(['user', 'partner'] as const).map(who => (
+            <button key={who} type="button" onClick={() => onChange(who)} aria-pressed={value === who} style={choiceStyle(value === who)}>
+              {who === 'user' ? userName : partnerLabel}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function categoryPicker(value: Category, onChange: (c: Category) => void, wrap = true) {
+    return (
+      <div>
+        <span style={labelStyle}>Category</span>
+        <div className="no-scrollbar" style={wrap ? { display: 'flex', flexWrap: 'wrap', gap: '6px' } : { display: 'flex', gap: '6px', overflowX: 'auto', margin: '0 -20px', padding: '2px 20px 4px' }}>
+          {CAT_ORDER.map(cat => (
+            <Chip key={cat} C={C} label={CAT[cat].label} selected={value === cat} onClick={() => onChange(cat)} accent={CAT[cat].accent} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function storePicker(value: string, onChange: (v: string) => void, id: string) {
+    return (
+      <div>
+        <label htmlFor={id} style={labelStyle}>Store</label>
+        <input id={id} type="text" placeholder="AB, Sklavenitis, Lidl…" value={value} onChange={e => onChange(e.target.value)} style={inputStyle} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+          {SUPERMARKETS.map(sm => (
+            <Chip key={sm} C={C} label={sm} selected={value === sm} onClick={() => onChange(sm)} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // Main app
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: C.bg, paddingBottom: '32px', position: 'relative', zIndex: 0 }}
+    <div style={{ minHeight: '100vh', paddingBottom: '120px', position: 'relative' }}
       onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      <GlassBackground variant="app" />
       {demoBanner}
-      <style>{`
-        @keyframes pulse-fab { 0%,100% { box-shadow: 0 4px 20px rgba(27,95,173,0.45); } 50% { box-shadow: 0 4px 32px rgba(27,95,173,0.75); } }
-        @keyframes slide-up { from { opacity:0; transform:translateY(12px);} to { opacity:1; transform:translateY(0);} }
-        .slide-up { animation: slide-up 0.3s ease forwards; }
-        @keyframes bag-sway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
-      `}</style>
 
-      {BACKGROUND_STICKERS.map(st => (
-        <img key={st.src} src={st.src} alt="" style={{ position: 'fixed', pointerEvents: 'none', userSelect: 'none', ...st.style }} />
-      ))}
-
-      {/* Header */}
-      <header ref={headerRef} style={{ backgroundColor: C.bg, padding: '18px 20px 0', position: 'sticky', top: 0, zIndex: 20 }}>
-        <div style={{ maxWidth: '540px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <button onClick={() => setShowHome(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '20px', fontWeight: '900', color: C.accent, letterSpacing: '-0.5px', lineHeight: 1 }}>
-              pickle
+      {/* Title */}
+      <div style={{ position: 'relative', zIndex: 1, padding: '16px 22px 10px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px' }}>
+        <div style={{ minWidth: 0 }}>
+          <button type="button" onClick={() => setShowHome(true)} aria-label="Back to home" style={{ display: 'flex', alignItems: 'center', gap: '6px', minHeight: '32px', fontWeight: 800, fontSize: '16px', letterSpacing: '-0.4px', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <span style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: ACCENT }} />pickle
+          </button>
+          <h1 style={{ fontSize: '40px', fontWeight: 700, letterSpacing: '-1.4px', lineHeight: 1.05, margin: '6px 0 0', color: C.text }}>{titles[tab].title}</h1>
+          <p style={{ fontSize: '14px', fontWeight: 500, color: C.dim, margin: '4px 0 0' }}>{titles[tab].sub}</p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          {notifStatus === 'default' && householdCode && (
+            <button type="button" onClick={enableNotifications} aria-label="Enable notifications" title="Enable notifications" style={iconBtn}>
+              <Icon name="bell" size={18} />
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {notifStatus === 'default' && householdCode && (
-                <button
-                  onClick={enableNotifications}
-                  title="Enable notifications"
-                  style={{ backgroundColor: C.surface2, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '5px 8px', cursor: 'pointer', fontSize: '16px', lineHeight: 1, color: C.text }}
-                >🔔</button>
-              )}
-              <div style={{ fontSize: '12px', color: C.dim, fontWeight: '600', letterSpacing: '0.5px' }}>
-                {tab === 'split' && Math.abs(balance) > 0.01 ? (
-                  <span style={{ color: balance > 0 ? C.success : C.danger, fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '16px', fontWeight: '700' }}>
-                    {balance > 0 ? '+' : ''}€{Math.abs(balance).toFixed(2)}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
+          )}
+          {tab === 'shop' && toBuy.length > 0 && (
+            <>
+              <button type="button" onClick={shareList} aria-label="Share the list" title="Share the list" style={iconBtn}>
+                <Icon name="share" size={18} />
+              </button>
+              <button type="button" onClick={() => setShopMode(true)} aria-label="Shopping mode" title="Shopping mode" style={{ ...iconBtn, background: C.text, color: '#FFFFFF', border: 'none' }}>
+                <Icon name="cart" size={19} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
-          {/* Tabs — segmented control */}
-          <div style={{ display: 'flex', gap: '4px', padding: '4px', margin: '2px 0 10px', backgroundColor: C.surface2, border: `1px solid ${C.border}`, borderRadius: '14px' }}>
-            {([
-              { key: 'shop',  label: 'List',  icon: '🛒' },
-              { key: 'find',  label: 'Find',  icon: '🔍' },
-              { key: 'split', label: 'Split', icon: '💸' },
-            ] as { key: Tab; label: string; icon: string }[]).map(t => {
-              const sc = SECTION_COLORS[t.key as keyof typeof SECTION_COLORS];
-              const active = tab === t.key;
-              return (
-                <button key={t.key} onClick={() => setTab(t.key)} aria-pressed={active} style={{
-                  flex: 1, padding: '10px 6px', border: 'none', borderRadius: '10px',
-                  backgroundColor: active ? sc.bg : 'transparent',
-                  color: active ? sc.text : C.dim,
-                  cursor: 'pointer', fontFamily: 'inherit', fontWeight: '800', fontSize: '13px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  boxShadow: active ? `0 2px 8px ${sc.bg}40` : 'none',
-                  transition: 'background-color 0.15s, color 0.15s',
-                }}>
-                  <span style={{ fontSize: '15px', lineHeight: 1 }}>{t.icon}</span>
-                  <span>{t.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Category chips — inside sticky header, only on Find tab */}
-          {tab === 'find' && (() => {
-            const activeCat: Category | 'all' = filterCat !== 'all' ? filterCat : (search.trim().length < 2 && scrolledCat) || 'all';
-            return (
-              <div ref={chipBarRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none' }}>
+      {/* Sticky bar: search + category chips on Find */}
+      <header ref={headerRef} style={{ position: 'sticky', top: 0, zIndex: 20, ...(tab === 'find' ? { padding: '10px 16px 8px', background: 'rgba(238,241,234,0.78)', backdropFilter: 'blur(20px) saturate(160%)', WebkitBackdropFilter: 'blur(20px) saturate(160%)' } : {}) }}>
+        {tab === 'find' && (() => {
+          const activeCat: Category | 'all' = filterCat !== 'all' ? filterCat : (search.trim().length < 2 && scrolledCat) || 'all';
+          return (
+            <>
+              <label style={{ ...glass(999), height: '50px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Icon name="search" size={18} color={C.dim} strokeWidth={2.2} />
+                <span style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Search all products</span>
+                <input
+                  type="text" placeholder="Search all products…" value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: '16px', fontWeight: 500, color: C.text, fontFamily: 'inherit' }}
+                />
+                {search && (
+                  <button type="button" onClick={() => setSearch('')} aria-label="Clear search" style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'rgba(16,35,26,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <Icon name="close" size={14} />
+                  </button>
+                )}
+              </label>
+              <div ref={chipBarRef} className="no-scrollbar" style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '10px 0 2px' }}>
                 <Chip C={C} label="All" selected={activeCat === 'all'} onClick={() => setFilterCat('all')} />
                 {CAT_ORDER.map(c => (
                   <Chip key={c} C={C} label={CAT[c].label} selected={activeCat === c} onClick={() => setFilterCat(c)} accent={CAT[c].accent} />
                 ))}
               </div>
-            );
-          })()}
-        </div>
+            </>
+          );
+        })()}
       </header>
 
-      <div style={{ maxWidth: '540px', margin: '0 auto', padding: '0 16px' }}>
+      <main style={{ position: 'relative', zIndex: 1, padding: '0 16px' }}>
         {renameNotice && (
-          <div style={{ marginTop: '12px', backgroundColor: C.surface, border: `1.5px solid ${C.accent}`, borderRadius: '16px', padding: '16px 18px' }}>
-            <p style={{ fontSize: '16px', fontWeight: '800', color: C.text, margin: '0 0 6px' }}>We&apos;re pickle now 🥒</p>
-            <p style={{ fontSize: '13px', color: C.dim, margin: '0 0 10px', lineHeight: 1.5 }}>
+          <div className="slide-up" style={{ ...glass(24), marginTop: '8px', padding: '18px' }}>
+            <p style={{ fontSize: '17px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>We&apos;re pickle now</p>
+            <p style={{ fontSize: '14px', color: C.dim, margin: '0 0 10px', lineHeight: 1.5, fontWeight: 500 }}>
               To update the name and icon on your home screen, remove the app and add it again:
             </p>
-            <p style={{ fontSize: '13px', fontWeight: '700', color: C.text, margin: '0 0 10px', lineHeight: 1.5 }}>
+            <p style={{ fontSize: '14px', fontWeight: 700, color: C.text, margin: '0 0 10px', lineHeight: 1.5 }}>
               {renameNotice === 'ios' ? 'Safari → Share ↑ → Add to Home Screen' : 'Chrome → ⋮ menu → Add to Home screen'}
             </p>
             {householdCode && (
-              <p style={{ fontSize: '12px', color: C.dim, margin: '0 0 12px' }}>
+              <p style={{ fontSize: '13px', color: C.dim, margin: '0 0 14px', fontWeight: 500 }}>
                 Your household code: <strong style={{ color: C.text, letterSpacing: '1px' }}>{householdCode}</strong>
               </p>
             )}
             <button
+              type="button"
               onClick={() => { localStorage.setItem('pickle-rename-seen', '1'); setRenameNotice(null); }}
-              style={{ padding: '10px 16px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '800', cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ ...btnPrimary, width: 'auto', minHeight: '42px', fontSize: '14px' }}
             >
               Got it
             </button>
           </div>
         )}
 
-        {/* Shopping mode overlay */}
-        {shopMode && (
-          <div style={{ position: 'fixed', inset: 0, backgroundColor: C.bg, zIndex: 150, overflowY: 'auto', paddingBottom: '80px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 12px', position: 'sticky', top: 0, backgroundColor: C.bg, zIndex: 2, borderBottom: `1px solid ${C.border}` }}>
-              <div>
-                <p style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: C.dim, margin: 0 }}>Shopping mode</p>
-                <p style={{ fontSize: '13px', color: C.text, margin: '2px 0 0', fontWeight: '600' }}>
-                  {toBuy.length === 0 ? 'All done!' : `${toBuy.length} item${toBuy.length === 1 ? '' : 's'} left`}
-                </p>
-              </div>
-              <button onClick={() => setShopMode(false)} style={{ width: '36px', height: '36px', backgroundColor: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: '50%', fontSize: '20px', fontWeight: '400', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, flexShrink: 0 }}>
-                ×
-              </button>
-            </div>
-            <div style={{ padding: '8px 16px' }}>
-              {toBuy.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px 24px' }}>
-                  <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '22px', fontWeight: '700', color: C.text, margin: '0 0 8px' }}>All done!</p>
-                  <p style={{ fontSize: '14px', color: C.dim }}>Everything&apos;s been checked off.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
-                  {CAT_ORDER.flatMap(c => toBuy.filter(i => i.category === c)).map(item => (
-                    <button key={item.id} onClick={() => toggleBought(item.id)} style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%', padding: '16px 18px', backgroundColor: C.surface, border: `1.5px solid ${C.border}`, borderRadius: '14px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: `2.5px solid ${C.muted}`, flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: '17px', fontWeight: '700', color: C.text, margin: 0 }}>{item.name}</p>
-                        {(item.quantity && item.quantity !== '1') || item.notes ? (
-                          <p style={{ fontSize: '12px', color: C.dim, margin: '2px 0 0' }}>
-                            {item.quantity && item.quantity !== '1' ? `×${item.quantity}` : ''}{item.notes ? (item.quantity && item.quantity !== '1' ? ' · ' : '') + item.notes : ''}
-                          </p>
-                        ) : null}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {bought.length > 0 && (
-                <div style={{ marginTop: '28px' }}>
-                  <p style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase', color: C.dim, margin: '0 0 8px', paddingLeft: '4px' }}>Done ({bought.length})</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', opacity: 0.5 }}>
-                    {bought.map(item => (
-                      <button key={item.id} onClick={() => toggleBought(item.id)} style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '100%', padding: '14px 18px', backgroundColor: C.surface2, border: `1px solid ${C.border}`, borderRadius: '14px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: `2.5px solid ${C.muted}`, backgroundColor: C.muted, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <svg width="12" height="12" viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7.5L8 2.5" stroke={C.bg} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        </div>
-                        <p style={{ fontSize: '16px', fontWeight: '700', color: C.dim, margin: 0, textDecoration: 'line-through' }}>{item.name}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Shop */}
         {tab === 'shop' && (
-          <div style={{ paddingTop: '8px' }}>
-
+          <div>
             {/* Pending extras banner */}
             {pendingExtraActive && (
-              <div style={{ margin: '12px 0', padding: '14px 16px', backgroundColor: C.surface, border: `1.5px solid ${C.accent}60`, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+              <div className="slide-up" style={{ ...glass(22), marginTop: '8px', padding: '14px 14px 14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                 <div>
-                  <p style={{ fontSize: '13px', fontWeight: '700', color: C.text, margin: '0 0 2px' }}>Bought something extra?</p>
-                  <p style={{ fontSize: '11px', color: C.dim, margin: 0 }}>Something off the list — pending</p>
+                  <p style={{ fontSize: '15px', fontWeight: 700, color: C.text, margin: '0 0 2px' }}>Bought something extra?</p>
+                  <p style={{ fontSize: '13px', color: C.dim, margin: 0, fontWeight: 500 }}>Something that wasn&apos;t on the list</p>
                 </div>
-                <button onClick={() => setPendingExtraOpen(true)} style={{ padding: '8px 14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                <button type="button" onClick={() => setPendingExtraOpen(true)} style={{ ...btnPrimary, width: 'auto', minHeight: '40px', fontSize: '13px', padding: '0 16px' }}>
                   Add it
                 </button>
               </div>
             )}
 
-            {/* Buy again box */}
-            {(() => {
-              if (buyAgain.length === 0) return null;
-              return (
-                <div style={{ margin: '12px 0', backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: '16px', padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <p style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: C.dim, margin: 0 }}>Buy again</p>
-                    <button onClick={() => setBuyAgainOpen(true)} style={{ fontSize: '12px', color: C.accent, background: C.accentDim, border: `1px solid ${C.accent}40`, borderRadius: '20px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700', padding: '3px 10px' }}>See all</button>
-                  </div>
-                  <div ref={buyAgainRef} style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-                    {buyAgain.map(({ name, category, emoji }) => {
-                      const inList = items.some(i => !i.bought && i.name === name);
-                      return (
-                        <button key={name} onClick={() => {
-                          if (inList) return;
-                          const newItem: Item = { id: genId(), name, quantity: '1', notes: '', category, emoji, bought: false, addedBy: userName, createdAt: Date.now(), updatedAt: Date.now() };
-                          setItems(prev => [newItem, ...prev]);
-                          syncOp('item', 'upsert', newItem);
-                        }} style={{ padding: '7px 13px', borderRadius: '20px', flexShrink: 0, border: `1.5px solid ${inList ? '#F97316' : C.border}`, backgroundColor: inList ? '#F9731620' : C.surface2, color: inList ? '#F97316' : C.text, fontSize: '13px', fontWeight: inList ? '700' : '400', cursor: inList ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-                          {name}
-                        </button>
-                      );
-                    })}
-                  </div>
+            {/* Buy again */}
+            {buyAgain.length > 0 && (
+              <div style={{ marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 6px 8px' }}>
+                  <p style={sectionTitle}>Buy again</p>
+                  <button type="button" onClick={() => setBuyAgainOpen(true)} style={{ fontSize: '13px', fontWeight: 700, color: ACCENT, cursor: 'pointer', fontFamily: 'inherit', minHeight: '32px' }}>See all</button>
                 </div>
-              );
-            })()}
+                <div ref={buyAgainRef} className="no-scrollbar" style={{ display: 'flex', gap: '8px', overflowX: 'auto', margin: '0 -16px', padding: '2px 16px 6px' }}>
+                  {buyAgain.map(({ name, category, emoji }) => {
+                    const inList = items.some(i => !i.bought && i.name === name);
+                    return (
+                      <button key={name} type="button" disabled={inList} onClick={() => {
+                        if (inList) return;
+                        const newItem: Item = { id: genId(), name, quantity: '1', notes: '', category, emoji, bought: false, addedBy: userName, createdAt: Date.now(), updatedAt: Date.now() };
+                        setItems(prev => [newItem, ...prev]);
+                        syncOp('item', 'upsert', newItem);
+                      }} style={{ ...pillStyle(false), ...(inList ? { background: 'rgba(30,107,67,0.12)', color: ACCENT, boxShadow: 'none', border: '1px solid rgba(30,107,67,0.30)', cursor: 'default' } : {}) }}>
+                        <Icon name={inList ? 'check' : 'plus'} size={14} strokeWidth={2.6} />
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {Object.keys(grouped).length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '52px 24px 40px', position: 'relative' }}>
-                <img src="/stk-jello.png" alt="" style={{ position: 'absolute', top: '24px', right: '10px', width: '60px', transform: 'rotate(15deg)', pointerEvents: 'none', userSelect: 'none' }} />
-                <img src="/stk-tangerines.png" alt="" style={{ position: 'absolute', top: '28px', left: '10px', width: '50px', transform: 'rotate(-10deg)', pointerEvents: 'none', userSelect: 'none' }} />
-                <div style={{ width: '100%', borderRadius: '20px', overflow: 'hidden', marginBottom: '24px' }}>
-                  <img src="/image1.jpeg" alt="" style={{ width: '100%', height: '220px', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
-                </div>
-                <p style={{ fontFamily: "var(--font-mono), 'Courier New', monospace", fontSize: '18px', color: C.text, margin: '0 0 8px', fontWeight: '700' }}>your shopping list is empty</p>
-                <p style={{ fontSize: '13px', color: C.dim, margin: 0, lineHeight: 1.6, textAlign: 'center' }}>tap + to add an item or browse Find for ideas</p>
+              <div className="slide-up" style={{ ...glass(28), marginTop: '14px', padding: '12px 12px 28px', textAlign: 'center' }}>
+                <img src="/image1.jpeg" alt="" style={{ width: '100%', height: '200px', objectFit: 'cover', objectPosition: 'center', display: 'block', borderRadius: '20px' }} />
+                <p style={{ fontSize: '19px', color: C.text, margin: '20px 0 6px', fontWeight: 700, letterSpacing: '-0.3px' }}>Your list is empty</p>
+                <p style={{ fontSize: '14px', color: C.dim, margin: 0, lineHeight: 1.6, fontWeight: 500 }}>Tap + to add an item, or browse Find for ideas.</p>
               </div>
             ) : (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', marginBottom: '-6px' }}>
-                  <button onClick={() => setShopMode(true)} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', backgroundColor: SECTION_COLORS.shop.bg, border: 'none', borderRadius: '20px', color: '#fff', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.3px' }}>
-                    <span>🛒</span><span>Shopping mode</span>
-                  </button>
-                  <button onClick={shareList} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: '20px', color: C.dim, fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.3px' }}>
-                    <span>↑</span><span>Share</span>
-                  </button>
-                </div>
-                {CAT_ORDER.filter(c => grouped[c]).map((cat, i) => (
-                  <div key={cat} style={{ marginTop: i === 0 ? '20px' : '28px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', paddingLeft: '2px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: '800', letterSpacing: '0.5px', textTransform: 'uppercase', color: CAT[cat].accent }}>
-                          {CAT[cat].label}
-                        </span>
-                        <span style={{ fontSize: '12px', color: C.dim, fontWeight: '600' }}>{grouped[cat]!.length}</span>
-                      </div>
-                      <button
-                        onClick={() => setConfirmDelete({ type: 'category', cat, count: grouped[cat]!.length })}
-                        style={{ height: '28px', padding: '0 10px', fontSize: '12px', color: C.dim, backgroundColor: C.surface2, border: `1px solid ${C.border}`, borderRadius: '8px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, flexShrink: 0 }}
-                      >
-                        Clear
-                      </button>
+              CAT_ORDER.filter(c => grouped[c]).map(cat => (
+                <section key={cat} style={{ marginTop: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 6px 8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {catDot(CAT[cat].accent)}
+                      <h2 style={sectionTitle}>{CAT[cat].label}</h2>
+                      <span style={{ fontSize: '13px', color: C.dim, fontWeight: 500 }}>{grouped[cat]!.length}</span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '10px', borderLeft: `2px solid ${CAT[cat].accent}30` }}>
-                      {grouped[cat]!.map(item => (
-                        <ItemCard key={item.id} item={item} onToggle={toggleBought} onDelete={id => setConfirmDelete({ type: 'item', id, name: item.name })} onChangeQty={changeQty} onRename={i => openRename(i.id, i.name, 'item', i.category, i.emoji)} addedByColor={item.addedBy === userName ? '#1B5FAD' : item.addedBy === partnerName ? '#2D7D46' : '#C4C0B8'} C={C} />
-                      ))}
-                    </div>
+                    <button type="button" onClick={() => setConfirmDelete({ type: 'category', cat, count: grouped[cat]!.length })} style={textBtn}>
+                      Clear
+                    </button>
                   </div>
-                ))}
-
-              </>
+                  <div style={{ ...glass(22), padding: '0 14px' }}>
+                    {grouped[cat]!.map((item, i) => (
+                      <ItemCard
+                        key={item.id} item={item} first={i === 0}
+                        onToggle={toggleBought}
+                        onDelete={id => setConfirmDelete({ type: 'item', id, name: item.name })}
+                        onChangeQty={changeQty}
+                        onRename={it => openRename(it.id, it.name, 'item', it.category, it.emoji)}
+                        avatarColor={avatarFor(item.addedBy)} C={C}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))
             )}
+
             {bought.length > 0 && (
-              <div style={{ marginTop: '32px', marginBottom: '16px' }}>
+              <div style={{ marginTop: '24px' }}>
                 <button
+                  type="button" aria-expanded={boughtExpanded}
                   onClick={() => {
                     const next = !boughtExpanded;
                     setBoughtExpanded(next);
@@ -1138,12 +1102,15 @@ export default function App() {
                       setExpandedDates(new Set([new Date(mostRecentTs).toDateString()]));
                     }
                   }}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: C.surface, borderRadius: '12px', border: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit' }}
+                  style={{ ...glass(18), width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer', fontFamily: 'inherit', color: C.text }}
                 >
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: C.dim, letterSpacing: '1px', textTransform: 'uppercase' }}>
-                    Done ({bought.length})
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 700 }}>
+                    <span style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="check" size={12} color="#FFFFFF" strokeWidth={3.2} />
+                    </span>
+                    In the basket · {bought.length}
                   </span>
-                  <span style={{ fontSize: '16px', color: C.muted, transform: boughtExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>˅</span>
+                  <Icon name="chevron-down" size={18} style={{ transform: boughtExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </button>
                 {boughtExpanded && (() => {
                   const groupMap: Record<string, { ts: number; items: Item[] }> = {};
@@ -1158,7 +1125,7 @@ export default function App() {
                     .map(([key, g]) => ({ key, ts: g.ts, label: fmtDate(g.ts), items: g.items }))
                     .sort((a, b) => b.ts - a.ts);
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
                       {groups.map(group => {
                         const isOpen = expandedDates.has(group.key);
                         const toggleDate = () => setExpandedDates(prev => {
@@ -1168,35 +1135,33 @@ export default function App() {
                         });
                         const matchExp = expenses.find(ex => new Date(ex.createdAt).toDateString() === group.key);
                         return (
-                          <div key={group.key}>
-                            <button onClick={toggleDate} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', backgroundColor: C.surface2, borderRadius: isOpen ? '12px 12px 0 0' : '12px', border: `1px solid ${C.border}`, borderBottom: isOpen ? 'none' : `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: '700', color: C.text }}>{group.label}</span>
+                          <div key={group.key} className="slide-up" style={{ ...glass(20), overflow: 'hidden' }}>
+                            <button type="button" onClick={toggleDate} aria-expanded={isOpen} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '12px 16px', cursor: 'pointer', fontFamily: 'inherit', color: C.text, textAlign: 'left' }}>
+                              <span style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                                <span style={{ fontSize: '14px', fontWeight: 700 }}>{group.label}</span>
                                 {matchExp && (
-                                  <span style={{ fontSize: '11px', color: C.dim, fontWeight: '600' }}>
+                                  <span style={{ fontSize: '12px', color: C.dim, fontWeight: 500 }}>
                                     {[matchExp.note, `€${matchExp.amount.toFixed(2)}`, resolvePaidBy(matchExp.paidBy) || matchExp.paidBy].filter(Boolean).join(' · ')}
                                   </span>
                                 )}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '12px', color: C.muted }}>{group.items.length} item{group.items.length !== 1 ? 's' : ''}</span>
-                                <span style={{ fontSize: '14px', color: C.muted, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>˅</span>
-                              </div>
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, fontSize: '12px', color: C.dim, fontWeight: 600 }}>
+                                {group.items.length} item{group.items.length !== 1 ? 's' : ''}
+                                <Icon name="chevron-down" size={16} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                              </span>
                             </button>
                             {isOpen && (
-                              <div style={{ border: `1px solid ${C.border}`, borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
-                                {group.items.map((item, idx) => (
-                                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', backgroundColor: C.surface, borderTop: idx > 0 ? `1px solid ${C.border}` : 'none', opacity: 0.7 }}>
-                                    <button onClick={() => toggleBought(item.id)} style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${CAT[item.category].accent}`, backgroundColor: CAT[item.category].accent, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7.5L8 2.5" stroke="#0A0A0A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                              <div style={{ padding: '0 16px' }}>
+                                {group.items.map(item => (
+                                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', minHeight: '48px', borderTop: `1px solid ${HAIRLINE}` }}>
+                                    <button type="button" onClick={() => toggleBought(item.id)} aria-label={`Put ${item.name} back on the list`} style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: CAT[item.category].accent, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Icon name="check" size={12} color="#FFFFFF" strokeWidth={3.2} />
                                     </button>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <span style={{ fontSize: '14px', color: C.dim, textDecoration: 'line-through', fontWeight: '700' }}>{item.name}</span>
-                                      {item.quantity && item.quantity !== '1' && <span style={{ color: C.muted, fontSize: '12px', marginLeft: '6px' }}>×{item.quantity}</span>}
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                      {item.addedBy && <span style={{ fontSize: '11px', color: C.muted, fontWeight: '600' }}>{item.addedBy}</span>}
-                                    </div>
+                                    <span style={{ flex: 1, minWidth: 0, fontSize: '14px', color: C.dim, textDecoration: 'line-through', fontWeight: 600 }}>
+                                      {item.name}
+                                      {item.quantity && item.quantity !== '1' && <span style={{ textDecoration: 'none', marginLeft: '6px' }}>×{item.quantity}</span>}
+                                    </span>
+                                    {item.addedBy && <span style={{ fontSize: '12px', color: C.muted, fontWeight: 600 }}>{item.addedBy}</span>}
                                   </div>
                                 ))}
                               </div>
@@ -1214,26 +1179,7 @@ export default function App() {
 
         {/* Find */}
         {tab === 'find' && (
-          <div style={{ paddingTop: '16px' }}>
-            {/* Search row */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <input
-                type="text"
-                placeholder="Search all products..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              <button
-                onClick={() => setAddCatalogOpen(true)}
-                style={{ padding: '0 16px', backgroundColor: C.accentDim, border: `1.5px solid ${C.accent}40`, borderRadius: '10px', color: C.accent, fontSize: '20px', fontWeight: '700', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
-                title="Add custom product"
-              >
-                +
-              </button>
-            </div>
-
-            {/* Product grid */}
+          <div style={{ paddingTop: '10px' }}>
             {filterCat === 'all' && search.length < 2 ? (
               CAT_ORDER.map(cat => {
                 const prods = PRODUCTS.filter(p => p.category === cat);
@@ -1243,16 +1189,17 @@ export default function App() {
                   ...custom.map(cp => ({ ...cp, emoji: '', isCustom: true as const })),
                 ];
                 return (
-                  <div key={cat} ref={el => { if (el) catSectionRefs.current.set(cat, el); else catSectionRefs.current.delete(cat); }} style={{ marginBottom: '28px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', letterSpacing: '0.5px', textTransform: 'uppercase', color: CAT[cat].accent, marginBottom: '10px' }}>
-                      {CAT[cat].label}
+                  <section key={cat} ref={el => { if (el) catSectionRefs.current.set(cat, el); else catSectionRefs.current.delete(cat); }} style={{ marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 6px 10px' }}>
+                      {catDot(CAT[cat].accent)}
+                      <h2 style={sectionTitle}>{CAT[cat].label}</h2>
                     </div>
                     <ProductGrid products={allInCat} items={items} justAdded={justAdded} onAdd={addFromCatalog} onRename={p => p.isCustom ? openRename(p.id, p.name, 'custom') : openRename(p.id, p.name, 'new', p.category, p.emoji)} recurring={recurring} onToggleRecurring={toggleRecurring} C={C} />
-                  </div>
+                  </section>
                 );
               })
             ) : catalogProducts.length === 0 ? (
-              <Empty C={C} title="No results" sub="Try a different search or add it yourself" />
+              <Empty C={C} title="No results" sub="Try a different search, or tap + to add it yourself" />
             ) : (
               <ProductGrid products={catalogProducts} items={items} justAdded={justAdded} onAdd={addFromCatalog} onRename={p => p.isCustom ? openRename(p.id, p.name, 'custom') : openRename(p.id, p.name, 'new', p.category, p.emoji)} recurring={recurring} onToggleRecurring={toggleRecurring} C={C} />
             )}
@@ -1275,25 +1222,73 @@ export default function App() {
             onEditExpense={openEditExpense}
           />
         )}
-      </div>
+      </main>
 
-      {/* FAB */}
-      {tab === 'shop' && !formOpen && (
-        <button
-          onClick={() => setFormOpen(true)}
-          style={{ position: 'fixed', bottom: '28px', right: '20px', width: '56px', height: '56px', borderRadius: '50%', backgroundColor: SECTION_COLORS.shop.bg, color: '#FFFFFF', border: 'none', fontSize: '28px', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, fontWeight: '900', animation: 'pulse-fab 2.5s ease-in-out infinite' }}
-        >+</button>
+      <TabBar tab={tab} onTab={setTab} action={tabAction} />
+
+      {/* Shopping mode overlay */}
+      {shopMode && (
+        <div className="fade-in" style={{ position: 'fixed', top: 0, bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '430px', backgroundColor: C.bg, zIndex: 150, overflowY: 'auto', paddingBottom: '60px' }}>
+          <GlassBackground variant="app" />
+          <div style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', background: 'rgba(238,241,234,0.8)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+            <div>
+              <p style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-0.8px', color: C.text, margin: 0 }}>Shopping mode</p>
+              <p style={{ fontSize: '14px', color: C.dim, margin: '2px 0 0', fontWeight: 500 }}>
+                {toBuy.length === 0 ? 'All done!' : `${toBuy.length} item${toBuy.length === 1 ? '' : 's'} left`}
+              </p>
+            </div>
+            <button type="button" onClick={() => setShopMode(false)} aria-label="Close shopping mode" style={iconBtn}>
+              <Icon name="close" size={18} />
+            </button>
+          </div>
+          <div style={{ position: 'relative', zIndex: 1, padding: '8px 16px' }}>
+            {toBuy.length === 0 ? (
+              <Empty C={C} title="All done!" sub="Everything's been checked off." />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {CAT_ORDER.flatMap(c => toBuy.filter(i => i.category === c)).map(item => (
+                  <button key={item.id} type="button" onClick={() => toggleBought(item.id)} style={{ ...glass(20), display: 'flex', alignItems: 'center', gap: '16px', width: '100%', minHeight: '68px', padding: '14px 18px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
+                    <span style={{ width: '30px', height: '30px', borderRadius: '50%', border: '2px solid rgba(16,35,26,0.35)', flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: '18px', fontWeight: 700 }}>{item.name}</span>
+                      {(item.quantity && item.quantity !== '1') || item.notes ? (
+                        <span style={{ display: 'block', fontSize: '13px', color: C.dim, marginTop: '2px', fontWeight: 500 }}>
+                          {item.quantity && item.quantity !== '1' ? `×${item.quantity}` : ''}{item.notes ? (item.quantity && item.quantity !== '1' ? ' · ' : '') + item.notes : ''}
+                        </span>
+                      ) : null}
+                    </span>
+                    {catDot(CAT[item.category].accent, 10)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {bought.length > 0 && (
+              <div style={{ marginTop: '28px' }}>
+                <p style={{ ...sectionTitle, padding: '0 6px 8px' }}>In the basket · {bought.length}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {bought.map(item => (
+                    <button key={item.id} type="button" onClick={() => toggleBought(item.id)} style={{ ...glass(18), display: 'flex', alignItems: 'center', gap: '16px', width: '100%', minHeight: '56px', padding: '12px 18px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', opacity: 0.6 }}>
+                      <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: ACCENT, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="check" size={14} color="#FFFFFF" strokeWidth={3.2} />
+                      </span>
+                      <span style={{ fontSize: '16px', fontWeight: 600, color: C.dim, textDecoration: 'line-through' }}>{item.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Add item drawer */}
       {formOpen && (
         <Drawer C={C} onClose={() => setFormOpen(false)} title="Add to list">
-          <form onSubmit={addCustomItem} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* Name input + inline qty controls */}
+          <form onSubmit={addCustomItem} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input
-                  type="text"
+                  type="text" aria-label="Item name"
                   placeholder="Feta, Spaghetti, Shampoo…"
                   value={formName}
                   onChange={e => { setSuggestionPicked(false); setFormName(e.target.value); }}
@@ -1302,20 +1297,20 @@ export default function App() {
                 />
                 {formName.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                    <button type="button" onClick={() => setFormQty(String(Math.max(1, parseInt(formQty || '1') - 1)))} style={{ width: '32px', height: '32px', borderRadius: '8px', border: `1px solid ${C.border}`, backgroundColor: C.surface2, color: C.text, fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0, fontFamily: 'inherit' }}>−</button>
-                    <span style={{ fontSize: '14px', fontWeight: '700', color: C.text, minWidth: '22px', textAlign: 'center' }}>{formQty || '1'}</span>
-                    <button type="button" onClick={() => setFormQty(String(parseInt(formQty || '1') + 1))} style={{ width: '32px', height: '32px', borderRadius: '8px', border: `1px solid ${C.border}`, backgroundColor: C.surface2, color: C.text, fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0, fontFamily: 'inherit' }}>+</button>
+                    <button type="button" aria-label="Less" onClick={() => setFormQty(String(Math.max(1, parseInt(formQty || '1') - 1)))} style={stepBtn}><Icon name="minus" size={14} strokeWidth={2.4} /></button>
+                    <span style={{ fontSize: '16px', fontWeight: 700, color: C.text, minWidth: '22px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{formQty || '1'}</span>
+                    <button type="button" aria-label="More" onClick={() => setFormQty(String(parseInt(formQty || '1') + 1))} style={stepBtn}><Icon name="plus" size={14} strokeWidth={2.4} /></button>
                   </div>
                 )}
               </div>
               {/* Suggestions */}
               {!suggestionPicked && suggestions.length > 0 && (
-                <div style={{ marginTop: '6px', borderRadius: '12px', overflow: 'hidden', border: `1px solid ${C.border}` }}>
+                <div style={{ ...glass(16), marginTop: '8px', overflow: 'hidden' }}>
                   {suggestions.map((s, i) => (
-                    <button key={s.id} type="button" onClick={() => pickSuggestion(s)} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px 14px', border: 'none', borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : 'none', backgroundColor: C.surface2, cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px', color: C.text, textAlign: 'left' }}>
+                    <button key={s.id} type="button" onClick={() => pickSuggestion(s)} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', minHeight: '48px', padding: '0 16px', borderTop: i > 0 ? `1px solid ${HAIRLINE}` : 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '15px', fontWeight: 600, color: C.text, textAlign: 'left' }}>
                       <span style={{ flex: 1 }}>{s.name}</span>
-                      <span style={{ fontSize: '10px', color: CAT[s.category].text, backgroundColor: CAT[s.category].bg, padding: '3px 8px', borderRadius: '20px', fontWeight: '700', whiteSpace: 'nowrap', border: `1px solid ${CAT[s.category].accent}40` }}>
-                        {CAT[s.category].label}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: C.dim, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        {catDot(CAT[s.category].accent, 7)}{CAT[s.category].label}
                       </span>
                     </button>
                   ))}
@@ -1323,126 +1318,88 @@ export default function App() {
               )}
             </div>
 
-            {/* Category */}
-            <div>
-              <p style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', color: C.dim, margin: '0 0 8px' }}>Category</p>
-              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', margin: '0 -20px', padding: '0 20px 2px', scrollbarWidth: 'none' }}>
-                {CAT_ORDER.map(cat => (
-                  <Chip key={cat} C={C} label={CAT[cat].label} selected={formCat === cat} onClick={() => setFormCat(cat)} accent={CAT[cat].accent} />
-                ))}
-              </div>
-            </div>
+            {categoryPicker(formCat, setFormCat, false)}
 
             {/* Notes + submit — appear once name is filled */}
             {formName.length > 0 && (
               <>
                 <textarea
-                  placeholder="Note (optional) — organic, near the entrance…"
+                  aria-label="Note"
+                  placeholder="Note (optional): organic, near the entrance…"
                   value={formNotes}
                   onChange={e => setFormNotes(e.target.value)}
                   rows={2}
                   style={{ ...inputStyle, resize: 'none', lineHeight: '1.5' }}
                 />
-                <button type="submit" style={{ width: '100%', padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900' }}>
-                  Add to list
-                </button>
+                <button type="submit" style={btnPrimary}>Add to list</button>
               </>
             )}
           </form>
         </Drawer>
       )}
 
-      {/* Add to catalog drawer */}
       {/* Buy again — See all drawer */}
-      {buyAgainOpen && (() => {
-        return (
-          <Drawer C={C} onClose={() => setBuyAgainOpen(false)} title="Buy again">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {buyAgain.map(({ name, category, emoji }) => {
-                const inList = items.some(i => !i.bought && i.name === name);
-                return (
-                  <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', backgroundColor: C.surface2, borderRadius: '12px', border: `1px solid ${C.border}` }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: '14px', color: C.text, margin: 0, fontWeight: '700' }}>{name}</p>
-                      <p style={{ fontSize: '11px', color: C.dim, margin: '2px 0 0' }}>{CAT[category].label}</p>
-                    </div>
-                    <button onClick={() => {
-                      if (!inList) {
-                        const newItem: Item = { id: genId(), name, quantity: '1', notes: '', category, emoji, bought: false, addedBy: userName, createdAt: Date.now(), updatedAt: Date.now() };
-                        setItems(prev => [newItem, ...prev]);
-                        syncOp('item', 'upsert', newItem);
-                      }
-                      setBuyAgainOpen(false);
-                    }} style={{ padding: '7px 14px', borderRadius: '20px', border: `1.5px solid ${inList ? '#F97316' : C.accent}`, backgroundColor: inList ? '#F9731620' : C.accentDim, color: inList ? '#F97316' : C.accent, fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-                      {inList ? 'In list' : '+ Add'}
-                    </button>
+      {buyAgainOpen && (
+        <Drawer C={C} onClose={() => setBuyAgainOpen(false)} title="Buy again">
+          <div style={{ ...glass(20), padding: '0 16px' }}>
+            {buyAgain.map(({ name, category, emoji }, i) => {
+              const inList = items.some(it => !it.bought && it.name === name);
+              return (
+                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '12px', minHeight: '60px', borderTop: i > 0 ? `1px solid ${HAIRLINE}` : 'none' }}>
+                  {catDot(CAT[category].accent, 10)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '15px', color: C.text, margin: 0, fontWeight: 700 }}>{name}</p>
+                    <p style={{ fontSize: '12px', color: C.dim, margin: '1px 0 0', fontWeight: 500 }}>{CAT[category].label}</p>
                   </div>
-                );
-              })}
-            </div>
-          </Drawer>
-        );
-      })()}
+                  <button type="button" disabled={inList} onClick={() => {
+                    if (!inList) {
+                      const newItem: Item = { id: genId(), name, quantity: '1', notes: '', category, emoji, bought: false, addedBy: userName, createdAt: Date.now(), updatedAt: Date.now() };
+                      setItems(prev => [newItem, ...prev]);
+                      syncOp('item', 'upsert', newItem);
+                    }
+                    setBuyAgainOpen(false);
+                  }} style={{ ...textBtn, height: '36px', padding: '0 14px', ...(inList ? { backgroundColor: 'rgba(30,107,67,0.12)', color: ACCENT, cursor: 'default' } : { backgroundColor: C.text, color: '#FFFFFF' }) }}>
+                    {inList ? 'In list' : '+ Add'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </Drawer>
+      )}
 
+      {/* Add to catalog drawer */}
       {addCatalogOpen && (
         <Drawer C={C} onClose={() => setAddCatalogOpen(false)} title="Add to catalog">
           <form onSubmit={saveCustomProduct} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <p style={{ fontSize: '13px', color: C.dim, marginTop: '-8px' }}>
+            <p style={{ fontSize: '14px', color: C.dim, marginTop: '-10px', fontWeight: 500 }}>
               Save a product so it always appears in your catalog.
             </p>
             <div>
-              <label style={labelStyle}>Product name</label>
-              <input type="text" placeholder="e.g. Κυδωνόπαστο" value={cpName} onChange={e => setCpName(e.target.value)} autoFocus style={inputStyle} required />
+              <label htmlFor="cp-name" style={labelStyle}>Product name</label>
+              <input id="cp-name" type="text" placeholder="e.g. Κυδωνόπαστο" value={cpName} onChange={e => setCpName(e.target.value)} autoFocus style={inputStyle} required />
             </div>
-            <div>
-              <label style={labelStyle}>Category</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {CAT_ORDER.map(cat => (
-                  <button key={cat} type="button" onClick={() => setCpCat(cat)} style={{ padding: '6px 12px', borderRadius: '20px', border: `1.5px solid ${cpCat === cat ? CAT[cat].accent : C.border}`, backgroundColor: cpCat === cat ? CAT[cat].bg : C.surface2, color: cpCat === cat ? CAT[cat].text : C.text, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: cpCat === cat ? '700' : '500', whiteSpace: 'nowrap', transition: 'all 0.12s' }}>
-                    {CAT[cat].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button type="submit" style={{ width: '100%', padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900', marginTop: '4px' }}>
-              Save to catalog
-            </button>
+            {categoryPicker(cpCat, setCpCat)}
+            <button type="submit" style={btnPrimary}>Save to catalog</button>
           </form>
         </Drawer>
       )}
 
       {/* Shop done — send to split */}
       {shopDoneOpen && (
-        <Drawer C={C} onClose={() => setShopDoneOpen(false)} title="All done! 🛒">
+        <Drawer C={C} onClose={() => setShopDoneOpen(false)} title="All done!">
           <form onSubmit={addShopExpense} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <p style={{ fontSize: '22px', fontWeight: '700', color: C.text, marginTop: '-12px', lineHeight: 1.4 }}>
+            <p style={{ fontSize: '22px', fontWeight: 600, color: C.text, marginTop: '-10px', lineHeight: 1.35, letterSpacing: '-0.4px' }}>
               {shopDoneMsg}
             </p>
+            {whoPaid(shopPaidBy, setShopPaidBy)}
             <div>
-              <label style={labelStyle}>Who paid?</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {(['user', 'partner'] as const).map(who => (
-                  <button key={who} type="button" onClick={() => setShopPaidBy(who)} style={{ padding: '14px', border: `2px solid ${shopPaidBy === who ? C.accent : C.border}`, borderRadius: '12px', backgroundColor: shopPaidBy === who ? C.accentDim : 'transparent', color: shopPaidBy === who ? C.accent : C.dim, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700', transition: 'all 0.15s' }}>
-                    {who === 'user' ? userName : partnerName || '...'}
-                  </button>
-                ))}
-              </div>
+              <label htmlFor="shop-amount" style={labelStyle}>Amount (€)</label>
+              <input id="shop-amount" type="text" inputMode="decimal" placeholder="0.00" value={shopAmount} onChange={e => setShopAmount(e.target.value.replace(',', '.'))} autoFocus style={bigNumberInput} required />
             </div>
-            <div>
-              <label style={labelStyle}>Amount (€)</label>
-              <input type="text" inputMode="decimal" placeholder="0.00" value={shopAmount} onChange={e => setShopAmount(e.target.value.replace(',', '.'))} autoFocus style={{ ...inputStyle, fontSize: '28px', textAlign: 'center', fontWeight: '700', fontFamily: "var(--font-mono), 'Courier New', monospace" }} required />
-            </div>
-            <div>
-              <label style={labelStyle}>Supermarket</label>
-              <input type="text" placeholder="AB, Sklavenitis, Lidl…" value={shopSupermarket} onChange={e => setShopSupermarket(e.target.value)} style={inputStyle} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                {SUPERMARKETS.map(sm => (
-                  <button key={sm} type="button" onClick={() => setShopSupermarket(sm)} style={{ padding: '5px 10px', borderRadius: '8px', border: `1px solid ${shopSupermarket === sm ? C.accent : C.border}`, backgroundColor: shopSupermarket === sm ? C.accentDim : 'transparent', color: shopSupermarket === sm ? C.accent : C.dim, fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '600' }}>{sm}</button>
-                ))}
-              </div>
-            </div>
-            <button type="submit" style={{ width: '100%', padding: '14px', backgroundColor: SECTION_COLORS.split.bg, color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900', marginTop: '4px' }}>
-              Send to Split →
+            {storePicker(shopSupermarket, setShopSupermarket, 'shop-store')}
+            <button type="submit" style={{ ...btnPrimary, backgroundColor: ACCENT }}>
+              Send to Split <Icon name="arrow-right" size={18} strokeWidth={2.4} />
             </button>
           </form>
         </Drawer>
@@ -1451,27 +1408,14 @@ export default function App() {
       {/* Rename drawer */}
       {renameTarget && (
         <Drawer C={C} onClose={() => setRenameTarget(null)} title="Edit item">
-          <form onSubmit={saveRename} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <form onSubmit={saveRename} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={labelStyle}>Name</label>
-              <input type="text" value={renameName} onChange={e => setRenameName(e.target.value)} autoFocus required style={{ ...inputStyle, fontSize: '18px', fontWeight: '600' }} />
+              <label htmlFor="rename-name" style={labelStyle}>Name</label>
+              <input id="rename-name" type="text" value={renameName} onChange={e => setRenameName(e.target.value)} autoFocus required style={{ ...inputStyle, fontSize: '18px', fontWeight: 600 }} />
             </div>
-            <div>
-              <label style={labelStyle}>Category</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {CAT_ORDER.map(cat => (
-                  <button key={cat} type="button" onClick={() => setRenameCat(cat)} style={{ padding: '6px 12px', borderRadius: '20px', border: `1.5px solid ${renameCat === cat ? CAT[cat].accent : C.border}`, backgroundColor: renameCat === cat ? CAT[cat].bg : C.surface2, color: renameCat === cat ? CAT[cat].text : C.text, fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: renameCat === cat ? '700' : '400', whiteSpace: 'nowrap', transition: 'all 0.12s' }}>
-                    {CAT[cat].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button type="submit" style={{ width: '100%', padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900' }}>
-              Save
-            </button>
-            <button type="button" onClick={deleteFromRename} style={{ width: '100%', padding: '14px', backgroundColor: `${C.danger}15`, color: C.danger, border: `1.5px solid ${C.danger}50`, borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700' }}>
-              Delete
-            </button>
+            {categoryPicker(renameCat, setRenameCat)}
+            <button type="submit" style={btnPrimary}>Save</button>
+            <button type="button" onClick={deleteFromRename} style={btnDanger}>Delete</button>
           </form>
         </Drawer>
       )}
@@ -1480,58 +1424,51 @@ export default function App() {
       {pendingExtraOpen && (
         <Drawer C={C} onClose={() => setPendingExtraOpen(false)} title="Extra purchases">
           <form onSubmit={addPendingExtra} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <p style={{ fontSize: '13px', color: C.dim, marginTop: '-8px' }}>
-              Bought something not on the list? Log it here.
+            <p style={{ fontSize: '14px', color: C.dim, marginTop: '-10px', fontWeight: 500 }}>
+              Bought something that wasn&apos;t on the list? Log it here.
             </p>
             <div>
-              <label style={labelStyle}>What did you buy? <span style={{ color: C.muted, fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: '11px' }}>(optional)</span></label>
-              <input type="text" placeholder="e.g. chocolate, candles..." value={pendingExtraItems} onChange={e => setPendingExtraItems(e.target.value)} style={inputStyle} autoFocus />
+              <label htmlFor="extra-items" style={labelStyle}>What did you buy? <span style={{ color: C.muted, fontWeight: 500 }}>(optional)</span></label>
+              <input id="extra-items" type="text" placeholder="e.g. chocolate, candles…" value={pendingExtraItems} onChange={e => setPendingExtraItems(e.target.value)} style={inputStyle} autoFocus />
             </div>
             <div>
-              <label style={labelStyle}>Amount (€)</label>
-              <input type="text" inputMode="decimal" placeholder="0.00" value={pendingExtraAmount} onChange={e => setPendingExtraAmount(e.target.value.replace(',', '.'))} required style={{ ...inputStyle, fontSize: '28px', textAlign: 'center', fontWeight: '700', fontFamily: "var(--font-mono), 'Courier New', monospace" }} />
+              <label htmlFor="extra-amount" style={labelStyle}>Amount (€)</label>
+              <input id="extra-amount" type="text" inputMode="decimal" placeholder="0.00" value={pendingExtraAmount} onChange={e => setPendingExtraAmount(e.target.value.replace(',', '.'))} required style={bigNumberInput} />
             </div>
-            <button type="submit" style={{ width: '100%', padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900', marginTop: '4px' }}>
-              Add to Split
-            </button>
-            <button type="button" onClick={dismissPendingExtra} style={{ width: '100%', padding: '12px', backgroundColor: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: '12px', fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '600' }}>
-              Nothing extra
-            </button>
+            <button type="submit" style={btnPrimary}>Add to Split</button>
+            <button type="button" onClick={dismissPendingExtra} style={btnSecondary}>Nothing extra</button>
           </form>
         </Drawer>
       )}
 
       {/* Spending detail drawer */}
       {spendingOpen && (
-        <Drawer C={C} onClose={() => { setSpendingOpen(false); setRecapMonth(undefined); }} title="">
+        <Drawer C={C} onClose={() => { setSpendingOpen(false); setRecapMonth(undefined); }} title="Spending">
           <SpendingDetail allExp={allExp} C={C} now={now} budget={budget} userName={userName} partnerName={partnerName} initialMonth={recapMonth} />
         </Drawer>
       )}
 
       {/* Budget drawer */}
       {budgetOpen && (
-        <Drawer C={C} onClose={() => setBudgetOpen(false)} title="">
+        <Drawer C={C} onClose={() => setBudgetOpen(false)} title="Monthly limit">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <p style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', color: C.dim, margin: '0 0 6px' }}>Spending limit · {MONTHS_EN[now.getMonth()]}</p>
-              <p style={{ fontSize: '13px', color: C.dim, margin: 0, lineHeight: 1.6 }}>Monthly spending limit for {MONTHS_EN[now.getMonth()]}.</p>
-            </div>
+            <p style={{ fontSize: '14px', color: C.dim, margin: '-10px 0 0', lineHeight: 1.6, fontWeight: 500 }}>
+              How much the household wants to spend in {MONTHS_EN[now.getMonth()]}.
+            </p>
             <input
-              type="text" inputMode="decimal" placeholder="e.g. 300"
+              type="text" inputMode="decimal" placeholder="e.g. 300" aria-label="Monthly limit in euros"
               value={budgetInput} onChange={e => setBudgetInput(e.target.value.replace(',', '.'))} autoFocus
-              style={{ ...inputStyle, fontSize: '32px', textAlign: 'center', fontWeight: '700', fontFamily: "var(--font-mono), 'Courier New', monospace" }}
+              style={{ ...bigNumberInput, fontSize: '40px' }}
             />
             <button
+              type="button"
               onClick={() => { const v = parseFloat(budgetInput); if (!isNaN(v) && v > 0) { setBudget(v); setBudgetOpen(false); } }}
-              style={{ width: '100%', padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900' }}
+              style={btnPrimary}
             >
               Save
             </button>
             {budget && (
-              <button
-                onClick={() => { setBudget(null); setBudgetOpen(false); }}
-                style={{ width: '100%', padding: '12px', backgroundColor: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: '12px', fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '600' }}
-              >
+              <button type="button" onClick={() => { setBudget(null); setBudgetOpen(false); }} style={btnSecondary}>
                 Remove limit
               </button>
             )}
@@ -1543,54 +1480,18 @@ export default function App() {
       {expenseOpen && (
         <Drawer C={C} onClose={() => { setExpenseOpen(false); setExpenseDate(new Date().toISOString().split('T')[0]); }} title="New purchase">
           <form onSubmit={addExpense} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {whoPaid(expensePaidBy, setExpensePaidBy)}
             <div>
-              <label style={labelStyle}>Who paid?</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {(['user', 'partner'] as const).map(who => (
-                  <button key={who} type="button" onClick={() => setExpensePaidBy(who)} style={{ padding: '14px', border: `2px solid ${expensePaidBy === who ? C.accent : C.border}`, borderRadius: '12px', backgroundColor: expensePaidBy === who ? C.accentDim : 'transparent', color: expensePaidBy === who ? C.accent : C.dim, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700', transition: 'all 0.15s' }}>
-                    {who === 'user' ? userName : partnerName || '...'}
-                  </button>
-                ))}
-              </div>
+              <label htmlFor="exp-amount" style={labelStyle}>Amount (€)</label>
+              <input id="exp-amount" type="text" inputMode="decimal" placeholder="0.00" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value.replace(',', '.'))} autoFocus style={bigNumberInput} required />
             </div>
-
+            {categoryPicker(expenseCat, setExpenseCat, false)}
+            {storePicker(expenseNote, setExpenseNote, 'exp-store')}
             <div>
-              <label style={labelStyle}>Amount (€)</label>
-              <input type="text" inputMode="decimal" placeholder="0.00" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value.replace(',', '.'))} autoFocus style={{ ...inputStyle, fontSize: '28px', textAlign: 'center', fontWeight: '700', fontFamily: "var(--font-mono), 'Courier New', monospace" }} required />
+              <label htmlFor="exp-date" style={labelStyle}>Date</label>
+              <input id="exp-date" type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} style={{ ...inputStyle, colorScheme: 'light' }} required />
             </div>
-
-            <div>
-              <label style={labelStyle}>Category</label>
-              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-                {CAT_ORDER.map(cat => {
-                  const cc = CAT[cat];
-                  return (
-                    <button key={cat} type="button" onClick={() => setExpenseCat(cat)} style={{ padding: '7px 12px', borderRadius: '20px', border: `1.5px solid ${expenseCat === cat ? cc.accent : C.border}`, backgroundColor: expenseCat === cat ? cc.bg : C.surface2, color: expenseCat === cat ? cc.accent : C.text, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: expenseCat === cat ? '700' : '500', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      <span>{cc.emoji}</span><span>{cc.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Note</label>
-              <input type="text" placeholder="AB, Sklavenitis, Lidl…" value={expenseNote} onChange={e => setExpenseNote(e.target.value)} style={inputStyle} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                {SUPERMARKETS.map(sm => (
-                  <button key={sm} type="button" onClick={() => setExpenseNote(sm)} style={{ padding: '5px 10px', borderRadius: '8px', border: `1px solid ${expenseNote === sm ? C.accent : C.border}`, backgroundColor: expenseNote === sm ? C.accentDim : 'transparent', color: expenseNote === sm ? C.accent : C.dim, fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '600' }}>{sm}</button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Date</label>
-              <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} style={{ ...inputStyle, colorScheme: 'light' }} required />
-            </div>
-
-            <button type="submit" style={{ width: '100%', padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900', marginTop: '4px' }}>
-              Save
-            </button>
+            <button type="submit" style={btnPrimary}>Save</button>
           </form>
         </Drawer>
       )}
@@ -1601,125 +1502,90 @@ export default function App() {
         return (
         <Drawer C={C} onClose={() => setEditExpense(null)} title="Edit purchase">
           {drawerItems.length > 0 && (
-            <div style={{ marginBottom: '4px', padding: '12px 14px', backgroundColor: C.surface2, borderRadius: '12px', border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: C.dim, letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '8px' }}>Items bought</div>
+            <div style={{ ...glass(18), marginBottom: '16px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: C.dim, marginBottom: '8px' }}>Items bought</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {drawerItems.map(it => (
-                  <span key={it.id} style={{ fontSize: '12px', color: C.text, backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '3px 8px' }}>
-                    {it.emoji} {it.name}
+                  <span key={it.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: C.text, backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: '999px', padding: '4px 10px' }}>
+                    {catDot(CAT[it.category].accent, 7)}{it.name}
                   </span>
                 ))}
               </div>
             </div>
           )}
           <form onSubmit={saveEditExpense} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {whoPaid(editPaidBy, setEditPaidBy)}
             <div>
-              <label style={labelStyle}>Who paid?</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {(['user', 'partner'] as const).map(who => (
-                  <button key={who} type="button" onClick={() => setEditPaidBy(who)} style={{ padding: '14px', border: `2px solid ${editPaidBy === who ? C.accent : C.border}`, borderRadius: '12px', backgroundColor: editPaidBy === who ? C.accentDim : 'transparent', color: editPaidBy === who ? C.accent : C.dim, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700', transition: 'all 0.15s' }}>
-                    {who === 'user' ? userName : partnerName || '...'}
-                  </button>
-                ))}
-              </div>
+              <label htmlFor="edit-amount" style={labelStyle}>Amount (€)</label>
+              <input id="edit-amount" type="text" inputMode="decimal" placeholder="0.00" value={editAmount} onChange={e => setEditAmount(e.target.value.replace(',', '.'))} autoFocus style={bigNumberInput} required />
             </div>
-
+            {categoryPicker(editCat, setEditCat, false)}
+            {storePicker(editNote, setEditNote, 'edit-store')}
             <div>
-              <label style={labelStyle}>Amount (€)</label>
-              <input type="text" inputMode="decimal" placeholder="0.00" value={editAmount} onChange={e => setEditAmount(e.target.value.replace(',', '.'))} autoFocus style={{ ...inputStyle, fontSize: '28px', textAlign: 'center', fontWeight: '700', fontFamily: "var(--font-mono), 'Courier New', monospace" }} required />
+              <label htmlFor="edit-date" style={labelStyle}>Date</label>
+              <input id="edit-date" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ ...inputStyle, colorScheme: 'light' }} required />
             </div>
-
-            <div>
-              <label style={labelStyle}>Category</label>
-              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-                {CAT_ORDER.map(cat => {
-                  const cc = CAT[cat];
-                  return (
-                    <button key={cat} type="button" onClick={() => setEditCat(cat)} style={{ padding: '7px 12px', borderRadius: '20px', border: `1.5px solid ${editCat === cat ? cc.accent : C.border}`, backgroundColor: editCat === cat ? cc.bg : C.surface2, color: editCat === cat ? cc.accent : C.text, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: editCat === cat ? '700' : '500', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      <span>{cc.emoji}</span><span>{cc.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Note</label>
-              <input type="text" placeholder="AB, Sklavenitis, Lidl…" value={editNote} onChange={e => setEditNote(e.target.value)} style={inputStyle} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                {SUPERMARKETS.map(sm => (
-                  <button key={sm} type="button" onClick={() => setEditNote(sm)} style={{ padding: '5px 10px', borderRadius: '8px', border: `1px solid ${editNote === sm ? C.accent : C.border}`, backgroundColor: editNote === sm ? C.accentDim : 'transparent', color: editNote === sm ? C.accent : C.dim, fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '600' }}>{sm}</button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Date</label>
-              <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ ...inputStyle, colorScheme: 'light' }} required />
-            </div>
-
-            <button type="submit" style={{ width: '100%', padding: '14px', backgroundColor: C.accent, color: '#FFFFFF', border: 'none', borderRadius: '12px', fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '900', marginTop: '4px' }}>
-              Save changes
-            </button>
-            <button type="button" onClick={() => deleteExpenseById(editExpense.id)} style={{ width: '100%', padding: '12px', backgroundColor: `${C.danger}15`, color: C.danger, border: `1px solid ${C.danger}60`, borderRadius: '12px', fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: '700' }}>
-              Delete
-            </button>
+            <button type="submit" style={btnPrimary}>Save changes</button>
+            <button type="button" onClick={() => deleteExpenseById(editExpense.id)} style={btnDanger}>Delete</button>
           </form>
         </Drawer>
         );
       })()}
 
-      {/* Receipt review drawer */}
+      {/* Receipt review */}
       {receiptData && (
-        <div onClick={() => setReceiptData(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end' }}>
-          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: C.bg, borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-            {/* Header */}
-            <div style={{ padding: '20px 20px 12px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <p style={{ fontSize: '18px', fontWeight: '900', color: C.text, margin: 0 }}>
-                    📷 {receiptData.store || 'Receipt'}
-                  </p>
-                  <p style={{ fontSize: '12px', color: C.dim, margin: '2px 0 0' }}>
-                    {receiptData.items.filter(i => i.checked).length} of {receiptData.items.length} items selected
-                  </p>
-                </div>
-                <p style={{ fontSize: '22px', fontWeight: '900', color: C.text, margin: 0, fontFamily: "var(--font-mono), 'Courier New', monospace" }}>
-                  €{receiptData.items.filter(i => i.checked).reduce((s, i) => s + i.price, 0).toFixed(2)}
+        <div className="fade-in" onClick={() => setReceiptData(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, backgroundColor: 'rgba(16,35,26,0.32)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div role="dialog" aria-modal="true" aria-label="Review receipt" className="sheet-up" onClick={e => e.stopPropagation()} style={{ ...glassStrong('28px 28px 0 0'), width: '100%', maxWidth: '430px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', borderBottom: 'none' }}>
+            <div style={{ padding: '20px 20px 14px', borderBottom: `1px solid ${HAIRLINE}`, flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px', fontWeight: 700, color: C.text, margin: 0, letterSpacing: '-0.4px' }}>
+                  <Icon name="receipt" size={20} /> {receiptData.store || 'Receipt'}
+                </p>
+                <p style={{ fontSize: '13px', color: C.dim, margin: '2px 0 0', fontWeight: 500 }}>
+                  {receiptData.items.filter(i => i.checked).length} of {receiptData.items.length} items selected
                 </p>
               </div>
+              <p style={{ ...numeral, fontSize: '30px', color: C.text, margin: 0 }}>
+                €{receiptData.items.filter(i => i.checked).reduce((s, i) => s + i.price, 0).toFixed(2)}
+              </p>
             </div>
 
-            {/* Items list */}
-            <div style={{ overflowY: 'auto', flex: 1, padding: '8px 0' }}>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '6px 0' }}>
               {receiptData.items.map((item, idx) => {
                 const d = getExpCatDisplay(item.category);
                 return (
-                  <div
-                    key={idx}
+                  <button
+                    key={idx} type="button" aria-pressed={item.checked}
                     onClick={() => setReceiptData(prev => prev ? { ...prev, items: prev.items.map((it, i) => i === idx ? { ...it, checked: !it.checked } : it) } : null)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 20px', cursor: 'pointer', opacity: item.checked ? 1 : 0.4 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', minHeight: '52px', padding: '8px 20px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', opacity: item.checked ? 1 : 0.45 }}
                   >
-                    <div style={{ width: '22px', height: '22px', borderRadius: '6px', border: `2px solid ${item.checked ? d.accent : C.border}`, backgroundColor: item.checked ? d.accent : C.surface2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {item.checked && <span style={{ color: '#fff', fontSize: '13px', fontWeight: '900' }}>✓</span>}
-                    </div>
-                    <span style={{ fontSize: '13px', color: C.text, flex: 1, lineHeight: 1.3 }}>{d.emoji} {item.name}</span>
-                    <span style={{ fontSize: '14px', fontWeight: '700', color: C.text, fontFamily: "var(--font-mono), 'Courier New', monospace", flexShrink: 0 }}>€{item.price.toFixed(2)}</span>
-                  </div>
+                    {item.checked ? (
+                      <span className="pop-in" style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: ACCENT, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="check" size={13} color="#FFFFFF" strokeWidth={3.2} />
+                      </span>
+                    ) : (
+                      <span style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1.8px solid rgba(16,35,26,0.35)', flexShrink: 0 }} />
+                    )}
+                    <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '14px', color: C.text, fontWeight: 600, lineHeight: 1.3 }}>{item.name}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: C.dim, fontWeight: 500 }}>{catDot(d.accent, 7)}{d.label}</span>
+                    </span>
+                    <span style={{ fontSize: '15px', fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>€{item.price.toFixed(2)}</span>
+                  </button>
                 );
               })}
             </div>
 
-            {/* Footer */}
-            <div style={{ padding: '16px 20px 32px', borderTop: `1px solid ${C.border}`, flexShrink: 0, display: 'flex', gap: '10px' }}>
+            <div style={{ padding: '14px 20px calc(28px + env(safe-area-inset-bottom))', borderTop: `1px solid ${HAIRLINE}`, flexShrink: 0, display: 'flex', gap: '10px' }}>
               <button
+                type="button"
                 onClick={confirmReceipt}
                 disabled={receiptData.items.filter(i => i.checked).length === 0}
-                style={{ flex: 1, padding: '16px', backgroundColor: C.accent, color: '#000', border: 'none', borderRadius: '14px', fontSize: '15px', fontWeight: '900', cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{ ...btnPrimary, flex: 1, opacity: receiptData.items.filter(i => i.checked).length === 0 ? 0.4 : 1 }}
               >
                 Add {receiptData.items.filter(i => i.checked).length} expenses
               </button>
-              <button onClick={() => setReceiptData(null)} style={{ padding: '16px 20px', backgroundColor: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: '14px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button type="button" onClick={() => setReceiptData(null)} style={{ ...btnSecondary, width: 'auto' }}>
                 Cancel
               </button>
             </div>
@@ -1727,16 +1593,17 @@ export default function App() {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
+      {/* Delete confirmation */}
       {confirmDelete && (
-        <div onClick={() => setConfirmDelete(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 40px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: C.surface, borderRadius: '20px', padding: '24px 20px 20px', width: '100%', maxWidth: '420px', margin: '0 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <p style={{ fontSize: '15px', fontWeight: '700', color: C.text, textAlign: 'center', lineHeight: 1.4 }}>
+        <div className="fade-in" onClick={() => setConfirmDelete(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, backgroundColor: 'rgba(16,35,26,0.32)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 calc(32px + env(safe-area-inset-bottom))' }}>
+          <div role="alertdialog" aria-modal="true" className="sheet-up" onClick={e => e.stopPropagation()} style={{ ...glassStrong(28), padding: '22px 18px 18px', width: '100%', maxWidth: '398px', margin: '0 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <p style={{ fontSize: '17px', fontWeight: 700, color: C.text, textAlign: 'center', lineHeight: 1.4, margin: '0 0 6px' }}>
               {confirmDelete.type === 'item'
                 ? `Remove "${confirmDelete.name}" from the list?`
                 : `Remove all ${confirmDelete.count} item${confirmDelete.count === 1 ? '' : 's'} in ${CAT[confirmDelete.cat].label}?`}
             </p>
             <button
+              type="button"
               onClick={() => {
                 if (confirmDelete.type === 'item') {
                   deleteItem(confirmDelete.id);
@@ -1747,11 +1614,11 @@ export default function App() {
                 }
                 setConfirmDelete(null);
               }}
-              style={{ width: '100%', padding: '14px', backgroundColor: C.danger, color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '900', cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ ...btnPrimary, backgroundColor: C.danger }}
             >
               Remove
             </button>
-            <button onClick={() => setConfirmDelete(null)} style={{ width: '100%', padding: '12px', backgroundColor: C.surface2, color: C.text, border: `1px solid ${C.border}`, borderRadius: '12px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button type="button" onClick={() => setConfirmDelete(null)} style={btnSecondary}>
               Cancel
             </button>
           </div>
